@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QBitTorrent Helper</title>
+    <link rel="icon" type="image/x-icon" href="/ui/favicon.ico">
+    <!-- 引入Bootstrap CSS -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-1 sidebar">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#dashboard">仪表盘</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#tasks">任务</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#settings">设置</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-10 content">
+                <div id="dashboard" class="tab-content">
+                    <!-- 仪表盘内容 -->
+                    <div class="card-deck mb-4">
+                        <div class="card me-3">
+                            <div class="card-body">
+                                <h5 class="card-title">种子数</h5>
+                                <p class="card-text">2000</p>
+                            </div>
+                        </div>
+                        <div class="card me-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Tracker 数</h5>
+                                <p class="card-text">2000</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">异常 Tracker 数</h5>
+                                <p class="card-text">2000</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="tasks" class="tab-content">
+                    <!-- 任务内容 -->
+                    <div class="card mb-4">
+                        <div class="card-header">手动任务</div>
+                        <div class="card-body">
+                            <button type="button" class="btn btn-primary me-3">执行 标签 操作</button>
+                            <button type="button" class="btn btn-primary">执行 跟踪器 操作</button>
+                            <div class="mt-4">
+                                <h5>任务结果</h5>
+                                <p>任务结果展示区域</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">自动任务</div>
+                        <div class="card-body">
+                            <button type="button" class="btn btn-primary mb-4">新增任务</button>
+                            <div class="mb-4">
+                                <label for="cronExpression1" class="form-label">Cron</label>
+                                <input type="text" class="form-control" id="cronExpression1" value="0 * * * *" placeholder="请输入 Cron 表达式">
+                                <label for="ruleName1" class="form-label ms-3 me-2">rule</label>
+                                <input type="text" class="form-control d-inline-block w-auto" id="ruleName1" value="rule_name" placeholder="请输入规则名称">
+                                <button type="button" class="btn btn-danger ms-3">删除任务</button>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cronExpression2" class="form-label">Cron</label>
+                                <input type="text" class="form-control" id="cronExpression2" value="0 * * * *" placeholder="请输入 Cron 表达式">
+                                <label for="ruleName2" class="form-label ms-3 me-2">rule</label>
+                                <input type="text" class="form-control d-inline-block w-auto" id="ruleName2" value="rule_name" placeholder="请输入规则名称">
+                                <button type="button" class="btn btn-danger ms-3">删除任务</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="settings" class="tab-content">
+                    <!-- 设置内容 -->
+                     <h2 class="mb-4">设置</h2>
+                     <div class="mb-4">
+                        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addRuleModal">新增规则</button>
+                        <button type="button" class="btn btn-secondary me-2" id="reloadConfigBtn">重载配置</button>
+                        <button type="button" class="btn btn-success" id="saveConfigBtn">保存配置</button>
+                     </div>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <form>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label for="qbHost" class="form-label">QBitTorrent 主机</label>
+                                        <input type="text" class="form-control" id="qbHost" placeholder="请输入主机地址">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="username" class="form-label">用户名</label>
+                                        <input type="text" class="form-control" id="username" placeholder="请输入用户名">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="password" class="form-label">密码</label>
+                                        <input type="password" class="form-control" id="password" placeholder="请输入密码">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="serverKey" class="form-label">Server酱 send key</label>
+                                        <input type="text" class="form-control" id="serverKey" placeholder="请输入send key">
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0">规则</h3>
+                    </div>
+                    <!-- 标签操作规则和跟踪器操作规则部分 -->
+                    <div class="row">
+                        <!-- 规则卡片将通过JavaScript动态渲染 -->
+                    </div>
+
+                    <!-- 新增规则模态框 -->
+                    <div class="modal fade" id="addRuleModal" tabindex="-1" aria-labelledby="addRuleModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="addRuleModalLabel">新增规则</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="addRuleForm">
+                                        <div class="mb-3">
+                                            <label for="ruleType" class="form-label">新增规则</label>
+                                            <select class="form-select" id="ruleType">
+                                                <option value="tag">新增标签处理规则</option>
+                                                <option value="tracker">新增跟踪器处理规则</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="newRuleName" class="form-label">规则名称</label>
+                                            <input type="text" class="form-control" id="newRuleName" placeholder="请输入规则名称">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="newOperationType" class="form-label">操作类型</label>
+                                            <select class="form-select" id="newOperationType">
+                                                <option value="add">添加</option>
+                                                <option value="delete">删除</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="tag-rule-fields" id="tagRuleFields">
+                                            <div class="mb-3">
+                                                <label for="trackerMatchCondition" class="form-label">跟踪器匹配条件</label>
+                                                <input type="text" class="form-control" id="trackerMatchCondition" placeholder="请输入跟踪器匹配条件">
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label for="tagToOperate" class="form-label">要添加或删除的标签</label>
+                                                <input type="text" class="form-control" id="tagToOperate" placeholder="请输入要添加或删除的标签">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="tracker-rule-fields" id="trackerRuleFields" style="display: none;">
+                                            <div class="mb-3">
+                                                <label for="trackerMatchCondition1" class="form-label">跟踪器匹配条件</label>
+                                                <input type="text" class="form-control" id="trackerMatchCondition1" placeholder="请输入跟踪器匹配条件">
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label for="trackerMatchCondition2" class="form-label">跟踪器匹配条件</label>
+                                                <input type="text" class="form-control" id="trackerMatchCondition2" placeholder="请输入跟踪器匹配条件">
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label for="trackerUrlToOperate" class="form-label">要操作的跟踪器 URL</label>
+                                                <input type="text" class="form-control" id="trackerUrlToOperate" placeholder="请输入要操作的跟踪器 URL">
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                    <button type="button" class="btn btn-primary" id="saveRuleBtn">保存</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入Bootstrap JS 和 自定义JS -->
+    <script src="/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/scripts.js"></script>
+</body>
+</html>

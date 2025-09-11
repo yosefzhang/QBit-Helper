@@ -1,0 +1,4 @@
+qbittorrent-api
+pyyaml
+flask
+apscheduler

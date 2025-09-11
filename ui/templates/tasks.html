@@ -1,0 +1,845 @@
+{% extends "layout.html" %}
+
+{% block title %}任务 - QBitTorrent Helper{% endblock %}
+
+{% block content %}
+<div id="tasks" class="tab-content">
+    <!-- 任务结果 -->
+    <h3 class="mb-0">任务执行结果</h3>
+    <hr>
+    <div id="taskResults" class="mt-3"></div>
+    <!-- 任务内容 -->
+    <h3 class="mb-0">任务列表</h3>
+    <hr>
+    <div class="ms-3 my-3"> 
+        <div class="mb-3">
+            <button type="button" class="btn btn-primary me-3" data-bs-toggle="modal" data-bs-target="#addTaskModal">新增任务</button>
+            <button type="button" class="btn btn-secondary me-3" id="reloadTasksBtn">重载任务</button>
+        </div>
+        <div id="tasksContainer">
+            <!-- 任务将通过JavaScript动态渲染 -->
+        </div>
+    </div>
+
+<!-- 新增任务模态框 -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addTaskModalLabel">新增任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTaskForm">
+                    <div class="mb-3">
+                        <label for="addTaskName" class="form-label">任务名称</label>
+                        <input type="text" class="form-control" id="addTaskName" placeholder="请输入任务名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="addTaskType" class="form-label">任务类型</label>
+                        <select class="form-select" id="addTaskType">
+                            <option value="manual">手动任务</option>
+                            <option value="auto">自动任务</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="addCronField" style="display: none;">
+                        <label for="addCronExpression" class="form-label">Cron表达式</label>
+                        <input type="text" class="form-control" id="addCronExpression" placeholder="请输入 Cron 表达式">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">规则选择</label>
+                        <div id="addRulesCheckboxContainer">
+                            <!-- 规则复选框将通过JavaScript动态渲染 -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveAddTaskBtn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑任务模态框 -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTaskModalLabel">编辑任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTaskForm">
+                    <input type="hidden" id="editTaskIndex" value="">
+                    <div class="mb-3">
+                        <label for="editTaskName" class="form-label">任务名称</label>
+                        <input type="text" class="form-control" id="editTaskName" placeholder="请输入任务名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editTaskType" class="form-label">任务类型</label>
+                        <select class="form-select" id="editTaskType">
+                            <option value="manual">手动任务</option>
+                            <option value="auto">自动任务</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="editCronField" style="display: none;">
+                        <label for="editCronExpression" class="form-label">Cron表达式</label>
+                        <input type="text" class="form-control" id="editCronExpression" placeholder="请输入 Cron 表达式">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">规则选择</label>
+                        <div id="editRulesCheckboxContainer">
+                            <!-- 规则复选框将通过JavaScript动态渲染 -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveEditTaskBtn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/ui/js/scripts.js"></script>
+<script>
+    // 存储获取到的规则数据
+    let fetchedRules = [];
+    
+    // 从后端获取任务配置
+    async function fetchTasks() {
+        try {
+            console.log('[Frontend Log] Sending GET request to /api/config/get_user_tasks');
+            const response = await fetch('/api/config/get_user_tasks');
+            console.log(`[Frontend Log] Received response from /api/config/get_user_tasks with status: ${response.status}`);
+            const result = await response.json();
+            console.log('[Frontend Log] Parsed JSON response:', result);
+            
+            if (result.success) {
+                // 正确处理返回的任务数据结构
+                const tasksData = result.data || {};
+                // 渲染任务列表
+                renderTasks(tasksData.tasks || []);
+            } else {
+                // 即使获取失败也显示任务区域，但可能为空
+                renderTasks([]);
+            }
+        } catch (error) {
+            console.error('获取任务失败:', error);
+            // 即使获取失败也显示任务区域，但可能为空
+            renderTasks([]);
+        }
+    }
+
+    // 渲染任务列表
+    function renderTasks(tasks) {
+        const tasksContainer = document.getElementById('tasksContainer');
+        if (!tasksContainer) return;
+        
+        // 清空现有内容
+        tasksContainer.innerHTML = '';
+        
+        // 确保tasks是数组
+        const tasksArray = Array.isArray(tasks) ? tasks : [];
+        
+        // 如果没有任务，显示提示信息
+        if (tasksArray.length === 0) {
+            tasksContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">暂无任务配置</div>
+                </div>
+            `;
+            return;
+        }
+        
+        // 创建一个行容器用于栅格布局
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'row';
+        
+        // 遍历任务并创建卡片
+        tasksArray.forEach((task, index) => {
+            const taskElement = createTaskElement(task, index);
+            rowDiv.appendChild(taskElement);
+        });
+        
+        tasksContainer.appendChild(rowDiv);
+    }
+
+    // 创建单个任务元素
+    function createTaskElement(task, index) {
+        const div = document.createElement('div');
+        div.className = 'col-md-6 col-lg-4 mb-3'; // 使用栅格系统限制宽度
+        
+        // 创建卡片容器
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card h-100';
+        
+        // 创建卡片头部，根据任务类型设置不同颜色
+        const cardHeader = document.createElement('div');
+        cardHeader.className = `card-header ${task.task_type === 'manual' ? 'bg-primary' : 'bg-success'} text-white d-flex justify-content-between align-items-center`;
+        
+        // 头部标题
+        const headerTitle = document.createElement('span');
+        headerTitle.textContent = task.task_type === 'manual' ? '手动任务' : '自动任务';
+        
+        // 按钮组
+        const buttonGroup = document.createElement('div');
+        
+        // 根据任务类型确定按钮
+        let actionButton;
+        if (task.task_type === 'manual') {
+            actionButton = document.createElement('button');
+            actionButton.className = 'btn btn-sm btn-outline-light me-2 execute-task-btn';
+            actionButton.textContent = '执行';
+            actionButton.dataset.index = index;
+        } else if (task.task_type === 'auto') {
+            actionButton = document.createElement('button');
+            actionButton.className = 'btn btn-sm btn-outline-light me-2 toggle-task-btn';
+            actionButton.textContent = '启用';
+            actionButton.dataset.index = index;
+        }
+        
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-sm btn-outline-light me-2 edit-task-btn';
+        editButton.textContent = '编辑';
+        editButton.dataset.index = index;
+        
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-sm btn-outline-light delete-task-btn';
+        deleteButton.textContent = '删除';
+        deleteButton.dataset.index = index;
+        
+        // 添加按钮到按钮组
+        if (actionButton) {
+            buttonGroup.appendChild(actionButton);
+        }
+        buttonGroup.appendChild(editButton);
+        buttonGroup.appendChild(deleteButton);
+        
+        // 组装卡片头部
+        cardHeader.appendChild(headerTitle);
+        cardHeader.appendChild(buttonGroup);
+        
+        // 创建表格显示任务信息
+        const table = document.createElement('table');
+        table.className = 'table mb-0';
+        
+        const tbody = document.createElement('tbody');
+        
+        // 任务名称行
+        const nameRow = document.createElement('tr');
+        nameRow.innerHTML = `<td><strong>任务名称:</strong></td><td>${task.task_name || '未命名任务'}</td>`;
+        tbody.appendChild(nameRow);
+        
+        // Cron表达式行
+        const cronRow = document.createElement('tr');
+        cronRow.innerHTML = `<td><strong>Cron:</strong></td><td>${task.cron || 'N/A'}</td>`;
+        tbody.appendChild(cronRow);
+        
+        // 解析规则字符串为数组
+        const rulesList = task.rules ? task.rules.split('|') : [];
+        const rulesDisplay = rulesList.length > 0 ? rulesList.join(', ') : 'N/A';
+        
+        // 规则行
+        const rulesRow = document.createElement('tr');
+        rulesRow.innerHTML = `<td><strong>规则:</strong></td><td>${rulesDisplay}</td>`;
+        tbody.appendChild(rulesRow);
+        
+        table.appendChild(tbody);
+        
+        // 创建卡片主体
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body p-0';
+        cardBody.appendChild(table);
+        
+        // 组装卡片
+        cardDiv.appendChild(cardHeader);
+        cardDiv.appendChild(cardBody);
+        
+        div.appendChild(cardDiv);
+        
+        // 绑定执行按钮事件（仅手动任务）
+        if (task.task_type === 'manual' && actionButton) {
+            actionButton.addEventListener('click', (function(taskCopy, indexCopy) {
+                return function() {
+                    executeManualTask(indexCopy, taskCopy);
+                };
+            })(task, index));
+        }
+        
+        // 绑定启用按钮事件（仅自动任务）
+        if (task.task_type === 'auto' && actionButton) {
+            actionButton.addEventListener('click', (function(taskCopy, indexCopy) {
+                return function() {
+                    toggleAutoTask(indexCopy, taskCopy);
+                };
+            })(task, index));
+        }
+        
+        // 绑定编辑按钮事件
+        editButton.addEventListener('click', (function(taskCopy, indexCopy) {
+            return function() {
+                editTask(indexCopy, taskCopy);
+            };
+        })(task, index));
+        
+        // 绑定删除按钮事件
+        deleteButton.addEventListener('click', (function(taskCopy, indexCopy) {
+            return function() {
+                deleteTask(indexCopy, taskCopy);
+            };
+        })(task, index));
+        
+        return div;
+    }
+
+    // 执行手动任务
+    async function executeManualTask(index, task) {
+        showToast(`正在执行手动任务: ${task.task_name || '未命名任务'}`, 'info');
+        
+        try {
+            // 调用后端API执行手动任务
+            const response = await fetch('/api/task/execute_manual_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_index: index })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(`手动任务 "${task.task_name || '未命名任务'}" 执行完成`, 'success');
+                console.log('手动任务执行结果:', result.data);
+                
+                // 显示详细的执行结果
+                displayTaskResult(index, task.task_name || '未命名任务', result.data);
+            } else {
+                showToast(`手动任务执行失败: ${result.message}`, 'danger');
+                console.error('手动任务执行失败:', result.message);
+            }
+        } catch (error) {
+            console.error('执行手动任务时发生错误:', error);
+            showToast(`执行手动任务时发生错误: ${error.message}`, 'danger');
+        }
+    }
+    
+    // 显示任务执行结果
+    function displayTaskResult(index, taskName, data) {
+        const taskResultsDiv = document.getElementById('taskResults');
+        
+        // 创建结果容器
+        const resultContainer = document.createElement('div');
+        resultContainer.className = 'task-result-item mb-3 p-3 border rounded position-relative';
+        
+        // 创建删除按钮
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-outline-danger position-absolute top-0 end-0 m-2 py-1 px-2';
+        deleteButton.setAttribute('aria-label', '删除');
+        deleteButton.innerHTML = '<i class="bi bi-trash"></i>';
+        deleteButton.addEventListener('click', function() {
+            resultContainer.remove();
+        });
+        resultContainer.appendChild(deleteButton);
+        
+        // 获取当前时间戳
+        const timestamp = new Date().toLocaleString('zh-CN');
+        
+        // 创建结果内容
+        const resultContent = document.createElement('div');
+        
+        // 添加时间戳、任务名称和执行结果统计信息
+        const headerElement = document.createElement('div');
+        if (!data) {
+            headerElement.innerHTML = `${timestamp} &nbsp;&nbsp; <strong>${taskName}</strong> &nbsp;&nbsp; 执行结果：无执行结果数据`;
+        } else {
+            headerElement.innerHTML = `${timestamp} &nbsp;&nbsp; <strong>${taskName}</strong> &nbsp;&nbsp; 执行结果：✅ 成功：${data.processed_count || 0} &nbsp;&nbsp;&nbsp;&nbsp;⏭ 跳过：${data.skipped_count || 0} &nbsp;&nbsp;&nbsp;&nbsp;❌ 失败：${data.failed_count || 0}`;
+        }
+        resultContent.appendChild(headerElement);
+            
+        // 添加成功详情
+        if (data && data.processed_details && data.processed_details.length > 0) {
+            const successHeader = document.createElement('div');
+            successHeader.innerHTML = '✅ <strong>成功详情：</strong>';
+            resultContent.appendChild(successHeader);
+            
+            const successList = document.createElement('ul');
+            data.processed_details.forEach(detail => {
+                const listItem = document.createElement('li');
+                listItem.textContent = detail;
+                successList.appendChild(listItem);
+            });
+            resultContent.appendChild(successList);
+        }
+        
+        // 添加失败详情
+        if (data && data.failed_details && data.failed_details.length > 0) {
+            const failHeader = document.createElement('div');
+            failHeader.innerHTML = '❌ <strong>失败详情：</strong>';
+            resultContent.appendChild(failHeader);
+            
+            const failList = document.createElement('ul');
+            data.failed_details.forEach(detail => {
+                const listItem = document.createElement('li');
+                listItem.textContent = detail;
+                failList.appendChild(listItem);
+            });
+            resultContent.appendChild(failList);
+        }
+        
+        resultContainer.appendChild(resultContent);
+        
+        // 将结果添加到taskResults div的顶部
+        taskResultsDiv.insertBefore(resultContainer, taskResultsDiv.firstChild);
+    }
+
+    // 启用/禁用自动任务
+    async function toggleAutoTask(index, task) {
+        // 检查当前任务状态（这里简化处理，实际应该从后端获取）
+        const isCurrentlyEnabled = task.status === 'enabled';
+        const newStatus = !isCurrentlyEnabled;
+        
+        showToast(`正在${newStatus ? '启用' : '禁用'}自动任务: ${task.task_name || '未命名任务'}`, 'info');
+        
+        try {
+            // 调用后端API切换自动任务状态
+            const response = await fetch('/api/task/toggle_auto_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    task_index: index, 
+                    enable: newStatus 
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(result.message, 'success');
+                // 更新任务状态（简化处理，实际应该重新加载任务列表）
+                task.status = newStatus ? 'enabled' : 'disabled';
+            } else {
+                showToast(`切换自动任务状态失败: ${result.message}`, 'danger');
+                console.error('切换自动任务状态失败:', result.message);
+            }
+        } catch (error) {
+            console.error('切换自动任务状态时发生错误:', error);
+            showToast(`切换自动任务状态时发生错误: ${error.message}`, 'danger');
+        }
+    }
+
+    // 删除任务
+    async function deleteTask(index, task) {
+        showConfirm(`确定要删除任务 "${task.task_name || '未命名任务'}" 吗？`, async function(confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                // 获取当前任务
+                console.log('[Frontend Log] Sending GET request to /api/config/get_user_tasks (deleteTask)');
+                const response = await fetch('/api/config/get_user_tasks');
+                console.log(`[Frontend Log] Received response from /api/config/get_user_tasks (deleteTask) with status: ${response.status}`);
+                const result = await response.json();
+                console.log('[Frontend Log] Parsed JSON response (deleteTask):', result);
+                
+                if (result.success) {
+                // 正确处理返回的任务数据结构
+                const tasksData = result.data || {};
+                let tasks = tasksData.tasks || [];
+                
+                // 确保 tasks 是数组
+                if (!Array.isArray(tasks)) {
+                    tasks = [];
+                }
+                
+                // 从任务数组中删除指定索引的任务
+                tasks.splice(index, 1);
+                    
+                    // 保存更新后的配置
+                    console.log('[Frontend Log] Sending POST request to /api/config/save_user_tasks (deleteTask), Data:', { tasks: tasks });
+                    const saveResponse = await fetch('/api/config/save_user_tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ tasks: tasks })
+                    });
+                    console.log(`[Frontend Log] Received response from /api/config/save_user_tasks (deleteTask) with status: ${saveResponse.status}`);
+                    const saveResult = await saveResponse.json();
+                    console.log('[Frontend Log] Parsed JSON response (deleteTask):', saveResult);
+                    
+                    if (saveResult.success) {
+                        showToast('任务删除成功');
+                        // 重新加载任务
+                        fetchTasks();
+                    } else {
+                        showToast('任务删除失败: ' + saveResult.message, 'danger');
+                    }
+                } else {
+                    showToast('获取任务失败: ' + result.message, 'danger');
+                }
+            } catch (error) {
+                console.error('删除任务失败:', error);
+                showToast('删除任务失败: ' + error.message, 'danger');
+            }
+        });
+    }
+
+    // 保存任务（编辑任务）
+    async function saveEditTask() {
+        // 获取表单数据
+        const index = document.getElementById('editTaskIndex').value;
+        let taskName = document.getElementById('editTaskName').value;
+        const taskType = document.getElementById('editTaskType').value;
+        const cronExpression = document.getElementById('editCronExpression').value;
+        
+        // 获取选中的规则
+        const checkboxes = document.querySelectorAll('#editRulesCheckboxContainer input[type="checkbox"]:checked');
+        const selectedRules = Array.from(checkboxes).map(cb => cb.value);
+        const rulesString = selectedRules.join('|');
+        
+        // 如果任务名为空，则自动填充带索引的默认任务名
+        if (!taskName) {
+            try {
+                // 获取当前任务列表以确定下一个索引号
+                const response = await fetch('/api/config/get_user_tasks');
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 正确处理返回的任务数据结构
+                    const tasksData = result.data || {};
+                    const tasks = tasksData.tasks || [];
+                    // 计算下一个未命名任务的索引
+                    let nextIndex = 1;
+                    const existingUnnamedTasks = tasks.filter(t => t.task_name && t.task_name.startsWith('未命名任务'));
+                    if (existingUnnamedTasks.length > 0) {
+                        // 提取所有索引号
+                        const indices = existingUnnamedTasks.map(t => {
+                            const match = t.task_name.match(/^未命名任务(\d+)$/);
+                            return match ? parseInt(match[1]) : 0;
+                        }).filter(n => n > 0);
+                        
+                        // 找到最大索引号
+                        const maxIndex = indices.length > 0 ? Math.max(...indices) : 0;
+                        nextIndex = maxIndex + 1;
+                    }
+                    taskName = `未命名任务${nextIndex}`;
+                } else {
+                    // 如果获取失败，默认使用未命名任务1
+                    taskName = '未命名任务1';
+                }
+            } catch (error) {
+                console.error('获取任务列表失败:', error);
+                // 如果获取失败，默认使用未命名任务1
+                taskName = '未命名任务1';
+            }
+        }
+        
+        // 构造任务对象
+        const task = {
+            'task_name': taskName,
+            'task_type': taskType,
+            'cron': cronExpression,
+            'rules': rulesString
+        };
+        
+        try {
+            // 获取当前任务
+            console.log('[Frontend Log] Sending GET request to /api/config/get_user_tasks (saveEditTask)');
+            const response = await fetch('/api/config/get_user_tasks');
+            console.log(`[Frontend Log] Received response from /api/config/get_user_tasks (saveEditTask) with status: ${response.status}`);
+            const result = await response.json();
+            console.log('[Frontend Log] Parsed JSON response (saveEditTask):', result);
+            
+            if (result.success) {
+                // 正确处理返回的任务数据结构
+                const tasksData = result.data || {};
+                let tasks = tasksData.tasks || [];
+                
+                // 确保 tasks 是数组
+                if (!Array.isArray(tasks)) {
+                    tasks = [];
+                }
+                
+                // 更新指定索引的任务
+                tasks[parseInt(index)] = task;
+                
+                // 保存配置
+                console.log('[Frontend Log] Sending POST request to /api/config/save_user_tasks (saveEditTask), Data:', { tasks: tasks });
+                const saveResponse = await fetch('/api/config/save_user_tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tasks: tasks })
+                });
+                
+                console.log(`[Frontend Log] Received response from /api/config/save_user_tasks (saveEditTask) with status: ${saveResponse.status}`);
+                const saveResult = await saveResponse.json();
+                console.log('[Frontend Log] Parsed JSON response (saveEditTask):', saveResult);
+                
+                if (saveResult.success) {
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editTaskModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    // 重新加载任务
+                    fetchTasks();
+                    showToast('任务保存成功');
+                } else {
+                    showToast('任务保存失败: ' + saveResult.message, 'danger');
+                }
+            } else {
+                showToast('获取任务失败: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            console.error('保存任务失败:', error);
+            showToast('保存任务失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 保存任务（新增任务）
+    async function saveTask() {
+        // 获取表单数据
+        let taskName = document.getElementById('addTaskName').value;
+        const taskType = document.getElementById('addTaskType').value;
+        const cronExpression = document.getElementById('addCronExpression').value;
+        
+        // 获取选中的规则
+        const checkboxes = document.querySelectorAll('#addRulesCheckboxContainer input[type="checkbox"]:checked');
+        const selectedRules = Array.from(checkboxes).map(cb => cb.value);
+        const rulesString = selectedRules.join('|');
+        
+        // 如果任务名为空，则自动填充带索引的默认任务名
+        if (!taskName) {
+            try {
+                // 获取当前任务列表以确定下一个索引号
+                const response = await fetch('/api/config/get_user_tasks');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const tasks = result.data?.tasks || [];
+                    // 计算下一个未命名任务的索引
+                    let nextIndex = 1;
+                    const existingUnnamedTasks = tasks.filter(t => t.task_name && t.task_name.startsWith('未命名任务'));
+                    if (existingUnnamedTasks.length > 0) {
+                        // 提取所有索引号
+                        const indices = existingUnnamedTasks.map(t => {
+                            const match = t.task_name.match(/^未命名任务(\d+)$/);
+                            return match ? parseInt(match[1]) : 0;
+                        }).filter(n => n > 0);
+                        
+                        // 找到最大索引号
+                        const maxIndex = indices.length > 0 ? Math.max(...indices) : 0;
+                        nextIndex = maxIndex + 1;
+                    }
+                    taskName = `未命名任务${nextIndex}`;
+                } else {
+                    // 如果获取失败，默认使用未命名任务1
+                    taskName = '未命名任务1';
+                }
+            } catch (error) {
+                console.error('获取任务列表失败:', error);
+                // 如果获取失败，默认使用未命名任务1
+                taskName = '未命名任务1';
+            }
+        }
+        
+        // 构造任务对象
+        const task = {
+            'task_name': taskName,
+            'task_type': taskType,
+            'cron': cronExpression,
+            'rules': rulesString
+        };
+        
+        try {
+            // 获取当前任务
+            console.log('[Frontend Log] Sending GET request to /api/config/get_user_tasks (saveTask)');
+            const response = await fetch('/api/config/get_user_tasks');
+            console.log(`[Frontend Log] Received response from /api/config/get_user_tasks (saveTask) with status: ${response.status}`);
+            const result = await response.json();
+            console.log('[Frontend Log] Parsed JSON response (saveTask):', result);
+            
+            if (result.success) {
+                // 正确处理返回的任务数据结构
+                const tasksData = result.data || {};
+                const tasks = tasksData.tasks || [];
+                
+                // 添加新任务
+                tasks.push(task);
+                
+                // 保存配置
+                console.log('[Frontend Log] Sending POST request to /api/config/save_user_tasks (saveTask), Data:', { tasks: tasks });
+                const saveResponse = await fetch('/api/config/save_user_tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tasks: tasks })
+                });
+                
+                console.log(`[Frontend Log] Received response from /api/config/save_user_tasks (saveTask) with status: ${saveResponse.status}`);
+                const saveResult = await saveResponse.json();
+                console.log('[Frontend Log] Parsed JSON response (saveTask):', saveResult);
+                
+                if (saveResult.success) {
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    // 重新加载任务
+                    fetchTasks();
+                    showToast('任务保存成功');
+                } else {
+                    showToast('任务保存失败: ' + saveResult.message, 'danger');
+                }
+            } else {
+                showToast('获取任务失败: ' + result.message, 'danger');
+            }
+        } catch (error) {
+            console.error('保存任务失败:', error);
+            showToast('保存任务失败: ' + error.message, 'danger');
+        }
+    }
+    
+    // 编辑任务
+    function editTask(index, task) {
+        // 填充编辑表单
+        document.getElementById('editTaskIndex').value = index;
+        document.getElementById('editTaskName').value = task.task_name || '';
+        document.getElementById('editTaskType').value = task.task_type || 'manual';
+        document.getElementById('editCronExpression').value = task.cron || '';
+        
+        // 根据任务类型显示或隐藏cron字段
+        const cronField = document.getElementById('editCronField');
+        if (task.task_type === 'auto') {
+            cronField.style.display = 'block';
+        } else {
+            cronField.style.display = 'none';
+        }
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('editTaskModal'));
+        modal.show();
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // 页面加载时获取任务列表
+        fetchTasks();
+        
+        // 绑定任务类型切换事件（新增任务模态框）
+        document.getElementById('addTaskType').addEventListener('change', function() {
+            const cronField = document.getElementById('addCronField');
+            if (this.value === 'auto') {
+                cronField.style.display = 'block';
+            } else {
+                cronField.style.display = 'none';
+            }
+        });
+        
+        // 绑定任务类型切换事件（编辑任务模态框）
+        document.getElementById('editTaskType').addEventListener('change', function() {
+            const cronField = document.getElementById('editCronField');
+            if (this.value === 'auto') {
+                cronField.style.display = 'block';
+            } else {
+                cronField.style.display = 'none';
+            }
+        });
+        
+        // 绑定保存新增任务按钮事件
+        document.getElementById('saveAddTaskBtn').addEventListener('click', saveTask);
+        
+        // 绑定保存编辑任务按钮事件
+        document.getElementById('saveEditTaskBtn').addEventListener('click', saveEditTask);
+        
+        // 绑定重载任务按钮事件
+        document.getElementById('reloadTasksBtn').addEventListener('click', function() {
+            fetchTasks();
+            showToast('任务列表已重载', 'success');
+        });
+        
+        // 绑定新增任务modal显示事件
+        const addTaskModal = document.getElementById('addTaskModal');
+        addTaskModal.addEventListener('show.bs.modal', function (event) {
+            // 清空表单
+            document.getElementById('addTaskForm').reset();
+            document.getElementById('addCronField').style.display = 'none';
+            
+            // 获取规则列表并渲染复选框
+            fetchRulesForTaskModal('add');
+        });
+        
+        // 绑定编辑任务modal显示事件
+        const editTaskModal = document.getElementById('editTaskModal');
+        editTaskModal.addEventListener('show.bs.modal', function (event) {
+            // 获取规则列表并渲染复选框
+            fetchRulesForTaskModal('edit');
+        });
+    });
+    
+    // 获取规则列表用于任务模态框
+    async function fetchRulesForTaskModal(modalType = 'add') {
+        try {
+            const response = await fetch('/api/config/get_user_rules');
+            const result = await response.json();
+            
+            if (result.success) {
+                fetchedRules = result.data || [];
+                if (modalType === 'add') {
+                    renderRuleCheckboxes(fetchedRules, 'addRulesCheckboxContainer');
+                } else {
+                    renderRuleCheckboxes(fetchedRules, 'editRulesCheckboxContainer');
+                }
+            }
+        } catch (error) {
+            console.error('获取规则失败:', error);
+        }
+    }
+    
+    // 渲染规则复选框
+    function renderRuleCheckboxes(rules, containerId = 'addRulesCheckboxContainer') {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        if (!rules || rules.length === 0) {
+            container.innerHTML = '<p class="text-muted">暂无可用规则</p>';
+            return;
+        }
+        
+        rules.forEach((rule, index) => {
+            const div = document.createElement('div');
+            div.className = 'form-check mb-2';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'form-check-input';
+            checkbox.id = `${containerId}Checkbox${index}`;
+            checkbox.value = rule.rule_name || `规则${index}`;
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.htmlFor = `${containerId}Checkbox${index}`;
+            
+            // 显示规则名称和优先级
+            label.textContent = (rule.rule_name || `规则${index}`) + ` (优先级: ${rule.priority || 99})`;
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            container.appendChild(div);
+        });
+    }
+</script>
+{% endblock %}

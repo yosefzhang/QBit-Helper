@@ -1,0 +1,72 @@
+.sidebar {
+    background-color: #f8f9fa;
+    height: 100vh;
+    padding-top: 0;
+    border-right: 1px solid #dee2e6;
+
+    .text-center.py-4 {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        padding: 20px 10px !important;
+        margin-bottom: 15px;
+
+        img {
+            border-radius: 50%;
+            background-color: white;
+            padding: 2px;
+        }
+
+        h5 {
+            margin: 8px 0 0 0;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+}
+
+.content {
+    padding: 20px;
+}
+
+.card {
+    margin-bottom: 20px;
+}
+
+.card-deck .card {
+    margin-right: 20px;
+}
+
+.card-deck .card:last-child {
+    margin-right: 0;
+}
+
+.form-label {
+    margin-bottom: 0.5rem;
+}
+
+.mb-4 {
+    margin-bottom: 1.5rem !important;
+}
+
+.me-3 {
+    margin-right: 1rem !important;
+}
+
+.me-2 {
+    margin-right: 0.5rem !important;
+}
+
+.ms-3 {
+    margin-left: 1rem !important;
+}
+
+.rule-card .card-header {
+    font-weight: bold;
+}
+
+.rule-card .card-text strong {
+    display: inline-block;
+    width: 100px;
+}

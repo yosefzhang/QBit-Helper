@@ -1,0 +1,178 @@
+{% extends "layout.html" %}
+
+{% block title %}仪表盘 - QBitTorrent Helper{% endblock %}
+
+{% block content %}
+<div id="dashboard" class="tab-content">
+    <!-- 错误提示 -->
+    <div id="errorAlert" class="alert alert-danger" role="alert" style="display: none;">
+        <!-- 错误信息将通过JavaScript动态填充 -->
+    </div>
+    
+    <!-- 仪表盘内容 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">种子数</h5>
+                    <p class="card-text" id="totalTorrents">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Tracker 数</h5>
+                    <p class="card-text" id="totalTrackers">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">异常 Tracker 数</h5>
+                    <p class="card-text" id="nonWorkingTrackers">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 分类统计 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">分类统计</h5>
+                </div>
+                <div class="card-body">
+                    <div id="categoryCounts" class="row">
+                        <!-- 分类统计信息将通过JavaScript动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 标签统计 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">标签统计</h5>
+                </div>
+                <div class="card-body">
+                    <div id="tagCounts" class="row">
+                        <!-- 标签统计信息将通过JavaScript动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// 获取仪表板信息（仪表盘页面）
+async function fetchDashboardInfo() {
+    try {
+        console.log('[Frontend Log] Sending GET request to /api/dashboard/info');
+        const response = await fetch('/api/dashboard/info');
+        console.log(`[Frontend Log] Received response from /api/dashboard/info with status: ${response.status}`);
+        const result = await response.json();
+        console.log('[Frontend Log] Parsed JSON response:', result);
+        
+        if (result.success) {
+            // 隐藏错误提示
+            const errorAlert = document.getElementById('errorAlert');
+            if (errorAlert) errorAlert.style.display = 'none';
+            
+            // 更新基础统计信息
+            const totalTorrentsEl = document.getElementById('totalTorrents');
+            const totalTrackersEl = document.getElementById('totalTrackers');
+            const nonWorkingTrackersEl = document.getElementById('nonWorkingTrackers');
+            
+            if (totalTorrentsEl) totalTorrentsEl.textContent = result.data.total_torrents;
+            if (totalTrackersEl) totalTrackersEl.textContent = result.data.total_trackers;
+            if (nonWorkingTrackersEl) nonWorkingTrackersEl.textContent = result.data.non_working_trackers;
+            
+            // 更新分类统计信息
+            const categoryCountsEl = document.getElementById('categoryCounts');
+            if (categoryCountsEl) {
+                // 清空现有内容
+                categoryCountsEl.innerHTML = '';
+                
+                // 遍历分类统计信息并创建卡片
+                for (const [category, count] of Object.entries(result.data.category_counts)) {
+                    const categoryCard = document.createElement('div');
+                    categoryCard.className = 'col-md-3 mb-3';
+                    categoryCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">${category}</h6>
+                                <p class="card-text">${count}</p>
+                            </div>
+                        </div>
+                    `;
+                    categoryCountsEl.appendChild(categoryCard);
+                }
+            }
+            
+            // 更新标签统计信息
+            const tagCountsEl = document.getElementById('tagCounts');
+            if (tagCountsEl) {
+                // 清空现有内容
+                tagCountsEl.innerHTML = '';
+                
+                // 遍历标签统计信息并创建卡片
+                for (const [tag, count] of Object.entries(result.data.tag_counts)) {
+                    const tagCard = document.createElement('div');
+                    tagCard.className = 'col-md-3 mb-3';
+                    tagCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">${tag}</h6>
+                                <p class="card-text">${count}</p>
+                            </div>
+                        </div>
+                    `;
+                    tagCountsEl.appendChild(tagCard);
+                }
+            }
+        } else {
+            // 显示错误提示
+            const errorAlert = document.getElementById('errorAlert');
+            if (errorAlert) {
+                errorAlert.textContent = result.message || '获取仪表板信息失败';
+                errorAlert.style.display = 'block';
+            }
+            
+            // 清空统计数据
+            const totalTorrentsEl = document.getElementById('totalTorrents');
+            const totalTrackersEl = document.getElementById('totalTrackers');
+            const nonWorkingTrackersEl = document.getElementById('nonWorkingTrackers');
+            
+            if (totalTorrentsEl) totalTorrentsEl.textContent = '0';
+            if (totalTrackersEl) totalTrackersEl.textContent = '0';
+            if (nonWorkingTrackersEl) nonWorkingTrackersEl.textContent = '0';
+            
+            // 清空分类和标签统计
+            const categoryCountsEl = document.getElementById('categoryCounts');
+            const tagCountsEl = document.getElementById('tagCounts');
+            
+            if (categoryCountsEl) categoryCountsEl.innerHTML = '';
+            if (tagCountsEl) tagCountsEl.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('获取仪表板信息失败:', error);
+        
+        // 显示错误提示
+        const errorAlert = document.getElementById('errorAlert');
+        if (errorAlert) {
+            errorAlert.textContent = '获取仪表板信息失败: ' + error.message;
+            errorAlert.style.display = 'block';
+        }
+    }
+}
+
+// 页面加载时获取仪表板信息
+fetchDashboardInfo();
+</script>
+{% endblock %}

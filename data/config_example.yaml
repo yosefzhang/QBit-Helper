@@ -1,0 +1,65 @@
+# 脚本默认配置，用户不可在前端修改
+default:
+  logging:
+    filename: QBittorrent-Helper.log
+    level: INFO
+
+# 用户配置，用户可在前端修改，将会保存到这里
+user_config:
+  qbittorrent:
+    host: http://192.168.0.123:8080
+    password: admin
+    username: password
+  webhook:
+    serverchan:
+      sc_key: 1234xxxx
+
+# 用户创建的规则，用户可在前端修改，将会保存到这里
+user_rules:
+  - rule_name:  '规则1'
+    rule_type: tag_opt
+    priority: 1
+    opt_type: 'add' # 操作类型，add 或 remove
+    trackers: '' # 匹配的 Tracker 列表，keyword1|keyword2|keyword3
+    tag: '' # 满足规则后，要添加或删除的标签
+  - rule_name:  '规则2'
+    rule_type: tag_opt
+    priority: 2
+    opt_type: 'remove' # 操作类型，add 或 remove
+    trackers: '' # 匹配的 Tracker 列表，keyword1|keyword2|keyword3
+    tag: '' # 满足规则后，要添加或删除的标签
+  - rule_name: '规则3'
+    rule_type: tracker_opt
+    priority: 3
+    opt_type: 'add' # 操作类型，add 或 remove
+    tags: '' # 匹配的标签列表，tag1|tag2|tag3
+    trackers: '' # 匹配的 Tracker 列表，keyword1|keyword2|keyword3
+    tracker: '' # 满足规则后，要添加或移除的 Tracker
+  - rule_name: '规则4'
+    rule_type: tracker_opt
+    priority: 4
+    opt_type: 'remove' # 操作类型，add 或 remove
+    tags: '' # 匹配的标签列表，tag1|tag2|tag3
+    trackers: '' # 匹配的 Tracker 列表，keyword1|keyword2|keyword3
+    tracker: '' # 满足规则后，要添加或移除的 Tracker
+  - rule_name: '规则5'
+    rule_type: duplicate_tag_opt
+    priority: 5
+# 用户创建的定时任务，用户可在前端修改，将会保存到这里
+user_tasks:
+  - task_name: 未命名任务1
+    task_type: manual
+    cron: ''
+    rules: ''
+  - task_name: 未命名任务2
+    task_type: manual
+    cron: ''
+    rules: ''
+  - task_name: '任务1'
+    task_type: 'auto'
+    cron: '0 0 0 * * ?'
+    rules: '规则1|规则2|规则3|规则4'
+  - task_name: '任务2'
+    task_type: 'auto'
+    cron: '0 0 0 * * ?'
+    rules: '规则1|规则2|规则3|规则4'
