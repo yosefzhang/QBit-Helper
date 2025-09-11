@@ -1,0 +1,13 @@
+services:
+  qbit-helper:
+    container_name: qbit-helper
+    image: docker-qbit-helper:latest
+    ports:
+      - "9290:8080"
+    volumes:
+      # 将主机目录挂载到容器中，以便访问视频文件
+      - /vol2/1000/app/qbit-helper/data:/app/data
+    environment:
+      - PYTHONPATH=/app
+    restart: always
+    network_mode: bridge

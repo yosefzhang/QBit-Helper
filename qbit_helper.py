@@ -34,6 +34,11 @@ class QBitHelperBasic:
     def __init__(self, config: str):
         # 初始化config_data
         self.config_data = config
+        
+        # 检查配置文件是否存在，如果不存在则从示例文件创建
+        if not os.path.exists(config):
+            self._create_config_from_example(config)
+        
         with open(config, 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
 
@@ -58,6 +63,48 @@ class QBitHelperBasic:
         
         # 加载自动任务
         self.load_auto_tasks()
+    
+    def _create_config_from_example(self, config_path: str):
+        """当配置文件不存在时，从示例文件创建配置文件"""
+        example_config_path = os.path.join('data', 'config_example.yaml')
+        
+        # 确保data目录存在
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        
+        if os.path.exists(example_config_path):
+            # 如果存在示例文件，读取示例文件内容
+            with open(example_config_path, 'r', encoding='utf-8') as f:
+                config_content = f.read()
+            
+            # 创建新的配置文件
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config_content)
+            
+            print(f"配置文件不存在，已从示例文件创建: {config_path}")
+        else:
+            # 如果示例文件也不存在，创建一个默认的配置文件结构
+            default_config = {
+                'default': {
+                    'logging': {
+                        'filename': 'QBittorrent-Helper.log',
+                        'level': 'INFO'
+                    }
+                },
+                'user_config': {
+                    'qbittorrent': {
+                        'host': 'http://localhost:8080',
+                        'username': 'admin',
+                        'password': 'adminadmin'
+                    }
+                },
+                'user_rules': [],
+                'user_tasks': []
+            }
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.safe_dump(default_config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            
+            print(f"配置文件和示例文件都不存在，已创建默认配置文件: {config_path}")
     
     def get_user_config(self):
         """获取用户配置"""

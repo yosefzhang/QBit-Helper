@@ -45,7 +45,7 @@ qbit-helper/
 - Python 3.7+
 - qBittorrent v4.1+
 
-### 安装步骤
+### 方式一：传统部署
 
 1. 克隆项目到本地：
    ```bash
@@ -70,10 +70,49 @@ qbit-helper/
 5. 启动应用：
    ```bash
    python app.py
+  
+   ```
+   推荐使用Gunicorn启动应用
+   ```bash
+      gunicorn --bind 0.0.0.0:8080 --workers 4 app:app
    ```
 
 6. 访问 Web 界面：
    - 打开浏览器访问 `http://localhost:5000`
+
+### 方式二：Docker部署（推荐）
+
+1. 确保已安装 Docker 和 Docker Compose
+
+2. 构建并启动容器：
+   ```bash
+   docker-compose up -d
+   ```
+
+3. 配置 qBittorrent：
+   - 确保 qBittorrent 正在运行
+   - 在 qBittorrent 设置中启用 Web UI
+   - 记录 Web UI 的访问地址、用户名和密码
+
+4. 配置应用：
+   - 复制 `data/config_example.yaml` 到 `data/config.yaml`
+   - 修改 `data/config.yaml` 中的 qBittorrent 连接信息
+
+5. 访问 Web 界面：
+   - 打开浏览器访问 `http://localhost:5000`
+
+### 方式三：直接使用Docker镜像
+
+1. 拉取镜像并运行容器：
+   ```bash
+   docker run -d \
+     --name qbit-helper \
+     -p 5000:5000 \
+     -v $(pwd)/data:/app/data \
+     your-image-name
+   ```
+
+2. 配置步骤同方式二的第3-5步
 
 ## 使用说明
 

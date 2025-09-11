@@ -2,3 +2,5 @@ qbittorrent-api
 pyyaml
 flask
 apscheduler
+serverchan-sdk
+gunicorn

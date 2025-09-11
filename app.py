@@ -225,6 +225,10 @@ def toggle_auto_task():
     except Exception as e:
         return jsonify({'success': False, 'message': f'切换自动任务状态时发生错误: {str(e)}'}), 500
 
+# 用于Gunicorn部署的入口点
+# 当使用Gunicorn运行时，不会执行以下代码
+# Gunicorn会直接导入app对象: gunicorn --bind 0.0.0.0:8080 --workers 4 app:app
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # 仅在直接运行此脚本时执行（不推荐用于生产环境）
+    app.run(debug=False, host='0.0.0.0', port=8080)
