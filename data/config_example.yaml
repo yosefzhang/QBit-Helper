@@ -51,15 +51,19 @@ user_tasks:
     task_type: manual
     cron: ''
     rules: ''
+    status: false
   - task_name: 未命名任务2
     task_type: manual
     cron: ''
     rules: ''
+    status: false
   - task_name: '任务1'
     task_type: 'auto'
     cron: '0 0 0 * * ?'
     rules: '规则1|规则2|规则3|规则4'
+    status: false
   - task_name: '任务2'
     task_type: 'auto'
     cron: '0 0 0 * * ?'
     rules: '规则1|规则2|规则3|规则4'
+    status: false

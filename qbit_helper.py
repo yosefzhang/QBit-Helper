@@ -1,12 +1,14 @@
 import os
 import logging
 import yaml
+import time
 from dataclasses import dataclass, field
 from typing import List, Any, Dict, Optional, Set
 import qbittorrentapi
 from serverchan_sdk import sc_send
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.jobstores.base import ConflictingIdError
 import atexit
 
 # 数据类定义
@@ -171,7 +173,7 @@ class QBitHelperBasic:
             if isinstance(task, dict):
                 ordered_task = {}
                 # 按照固定顺序添加字段
-                field_order = ['task_name', 'task_type', 'cron', 'rules']
+                field_order = ['task_name', 'task_type', 'cron', 'rules', 'status']
                 for field in field_order:
                     if field in task:
                         ordered_task[field] = task[field]
@@ -213,45 +215,170 @@ class QBitHelperBasic:
             tasks = user_tasks.get('tasks', [])
             
             for index, task in enumerate(tasks):
-                # 只处理自动任务
-                if task.get('task_type') == 'auto' and task.get('cron'):
+                # 只处理自动任务，并且任务状态为启用（status为True）
+                if (task.get('task_type') == 'auto' and 
+                    task.get('cron') and 
+                    task.get('status', False)):  # 修改默认值为False（禁用）
                     self.add_auto_task_to_scheduler(index, task)
             
-            self.logger.info(f"已加载 {len([t for t in tasks if t.get('task_type') == 'auto' and t.get('cron')])} 个自动任务")
+            self.logger.info(f"已加载 {len([t for t in tasks if t.get('task_type') == 'auto' and t.get('cron') and t.get('status', False)])} 个自动任务")
         except Exception as e:
             self.logger.error(f"加载自动任务时发生错误: {str(e)}")
     
     def add_auto_task_to_scheduler(self, index, task):
         """将自动任务添加到调度器"""
-        try:
-            cron_expression = task.get('cron')
-            task_name = task.get('task_name', f'自动任务{index}')
+        cron_expression = task.get('cron')
+        # 检查cron表达式是否为空或仅包含空白字符
+        if not cron_expression or not cron_expression.strip():
+            error_msg = f"任务 '{task.get('task_name', '未命名任务')}' 的cron表达式为空或无效"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)  # 抛出异常而不是直接返回
             
+        try:
             # 创建cron触发器
             trigger = CronTrigger.from_crontab(cron_expression)
             
+            # 生成任务ID，使用时间戳确保唯一性
+            task_id = f"auto_task_{index}_{int(time.time())}"
+            
             # 添加任务到调度器
-            job = self.scheduler.add_job(
-                self.execute_auto_task,
+            self.scheduler.add_job(
+                func=self._execute_auto_task_and_log_result,
                 trigger=trigger,
-                id=f"auto_task_{index}",
-                name=task_name,
-                args=[index, task]
+                id=task_id,
+                args=[index, task],
+                name=task.get('task_name', f'自动任务{index}'),
+                replace_existing=True
             )
             
-            self.logger.info(f"已添加自动任务: {task_name} (ID: {job.id})")
+            self.logger.info(f"已添加自动任务: {task.get('task_name', f'自动任务{index}')}")
+        except ConflictingIdError:
+            # 如果任务ID冲突，使用毫秒级时间戳重试
+            task_id = f"auto_task_{index}_{int(time.time() * 1000)}"
+            self.scheduler.add_job(
+                func=self._execute_auto_task_and_log_result,
+                trigger=trigger,
+                id=task_id,
+                args=[index, task],
+                name=task.get('task_name', f'自动任务{index}'),
+                replace_existing=True
+            )
+            self.logger.info(f"已添加自动任务: {task.get('task_name', f'自动任务{index}')}(ID冲突后重试)")
         except Exception as e:
-            self.logger.error(f"添加自动任务 {task.get('task_name', '未命名')} 到调度器时发生错误: {str(e)}")
+            self.logger.error(f"添加自动任务时发生错误: {str(e)}")
+            raise  # 重新抛出异常
     
     def remove_auto_task_from_scheduler(self, index):
         """从调度器中移除自动任务"""
         try:
-            job_id = f"auto_task_{index}"
-            if self.scheduler.get_job(job_id):
-                self.scheduler.remove_job(job_id)
-                self.logger.info(f"已从调度器中移除自动任务 ID: {job_id}")
+            jobs = self.scheduler.get_jobs()
+            for job in jobs:
+                if job.id.startswith(f"auto_task_{index}_"):
+                    self.scheduler.remove_job(job.id)
+                    self.logger.info(f"已从调度器中移除自动任务 ID: {job.id}")
+                    break
         except Exception as e:
             self.logger.error(f"从调度器中移除自动任务 {index} 时发生错误: {str(e)}")
+    
+    def _execute_auto_task_and_log_result(self, index, task):
+        """执行自动任务并记录结果的包装函数"""
+        try:
+            # 执行自动任务并获取结果
+            result = self.execute_auto_task(index, task)
+            
+            # 将结果保存到类变量中，供前端获取
+            if not hasattr(self, '_auto_task_results'):
+                self._auto_task_results = []
+            
+            # 添加任务执行结果，包含任务名称和执行时间
+            task_result = {
+                'task_name': task.get('task_name', f'自动任务{index}'),
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'result': result
+            }
+            
+            # 将新结果插入到列表开头
+            self._auto_task_results.insert(0, task_result)
+            
+            # 保持最多5条记录
+            if len(self._auto_task_results) > 5:
+                self._auto_task_results = self._auto_task_results[:5]
+                
+            # 记录自动任务结果到日志文件
+            self._log_auto_task_result(task_result)
+                
+        except Exception as e:
+            self.logger.error(f"执行自动任务 {task.get('task_name', f'自动任务{index}')} 时发生错误: {str(e)}")
+            # 即使出错也记录，但标记为失败
+            if not hasattr(self, '_auto_task_results'):
+                self._auto_task_results = []
+                
+            task_result = {
+                'task_name': task.get('task_name', f'自动任务{index}'),
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'result': {'error': str(e)},
+                'failed': True
+            }
+            
+            self._auto_task_results.insert(0, task_result)
+            
+            if len(self._auto_task_results) > 5:
+                self._auto_task_results = self._auto_task_results[:5]
+                
+            # 记录自动任务结果到日志文件（包括错误）
+            self._log_auto_task_result(task_result)
+    
+    def _log_auto_task_result(self, task_result):
+        """将自动任务结果记录到日志文件"""
+        try:
+            # 确保data目录存在
+            data_dir = 'data'
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            
+            # 日志文件路径
+            log_file = os.path.join(data_dir, 'auto_task_results.log')
+            
+            # 构建日志条目
+            timestamp = task_result.get('timestamp', time.strftime('%Y-%m-%d %H:%M:%S'))
+            task_name = task_result.get('task_name', '未知任务')
+            result = task_result.get('result', {})
+            
+            # 构建日志内容
+            if result and 'error' in result:
+                log_entry = f"[{timestamp}] 任务: {task_name} - 执行失败: {result.get('error', '未知错误')}\n"
+            else:
+                # 安全地获取结果统计信息
+                processed_count = result.get('processed_count', 0) if result else 0
+                skipped_count = result.get('skipped_count', 0) if result else 0
+                failed_count = result.get('failed_count', 0) if result else 0
+                
+                log_entry = f"[{timestamp}] 任务: {task_name} - 成功: {processed_count}, " \
+                           f"跳过: {skipped_count}, 失败: {failed_count}\n"
+                
+                # 添加详细的成功信息（安全检查）
+                processed_details = result.get('processed_details') if result else None
+                if processed_details and isinstance(processed_details, list):
+                    log_entry += f"  成功详情:\n"
+                    for detail in processed_details:
+                        if detail:  # 确保detail不是None或空
+                            log_entry += f"    - {detail}\n"
+                
+                # 添加详细的失败信息（安全检查）
+                failed_details = result.get('failed_details') if result else None
+                if failed_details and isinstance(failed_details, list):
+                    log_entry += f"  失败详情:\n"
+                    for detail in failed_details:
+                        if detail:  # 确保detail不是None或空
+                            log_entry += f"    - {detail}\n"
+            
+            # 写入日志文件
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+                f.write("\n")  # 添加空行分隔
+                
+        except Exception as e:
+            self.logger.error(f"记录自动任务结果到日志文件时发生错误: {str(e)}")
     
     def execute_auto_task(self, index, task):
         """执行自动任务"""

@@ -186,45 +186,6 @@ def execute_manual_task():
     except Exception as e:
         return jsonify({'success': False, 'message': f'执行手动任务时发生错误: {str(e)}'}), 500
 
-
-@app.route('/api/task/toggle_auto_task', methods=['POST'])
-def toggle_auto_task():
-    """启用/禁用自动任务"""
-    try:
-        # 获取请求数据
-        data = request.json
-        task_index = data.get('task_index')
-        enable = data.get('enable', True)
-        
-        # 获取用户任务
-        user_tasks = qbhper.get_user_tasks()
-        tasks = user_tasks.get('tasks', [])
-        
-        # 验证任务索引
-        if task_index < 0 or task_index >= len(tasks):
-            return jsonify({'success': False, 'message': '任务索引无效'}), 400
-        
-        # 获取任务信息
-        task = tasks[task_index]
-        task_name = task.get('task_name', '未命名任务')
-        
-        if enable:
-            # 启用自动任务，将任务添加到调度器
-            qbhper.add_auto_task_to_scheduler(task_index, task)
-            return jsonify({
-                'success': True, 
-                'message': f'自动任务 "{task_name}" 已启用'
-            })
-        else:
-            # 禁用自动任务，从调度器中移除任务
-            qbhper.remove_auto_task_from_scheduler(task_index)
-            return jsonify({
-                'success': True, 
-                'message': f'自动任务 "{task_name}" 已禁用'
-            })
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'切换自动任务状态时发生错误: {str(e)}'}), 500
-
 # 用于Gunicorn部署的入口点
 # 当使用Gunicorn运行时，不会执行以下代码
 # Gunicorn会直接导入app对象: gunicorn --bind 0.0.0.0:8080 --workers 4 app:app
