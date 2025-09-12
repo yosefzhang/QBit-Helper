@@ -69,10 +69,16 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 // 获取仪表板信息（仪表盘页面）
 async function fetchDashboardInfo() {
     try {
+        // 显示加载提示
+        showToast('正在加载仪表板数据...', 'info');
+        
         console.log('[Frontend Log] Sending GET request to /api/dashboard/info');
         const response = await fetch('/api/dashboard/info');
         console.log(`[Frontend Log] Received response from /api/dashboard/info with status: ${response.status}`);
@@ -173,6 +179,8 @@ async function fetchDashboardInfo() {
 }
 
 // 页面加载时获取仪表板信息
-fetchDashboardInfo();
+document.addEventListener('DOMContentLoaded', function() {
+    fetchDashboardInfo();
+});
 </script>
 {% endblock %}

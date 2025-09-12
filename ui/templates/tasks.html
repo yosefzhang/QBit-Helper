@@ -7,7 +7,31 @@
     <!-- 任务结果 -->
     <h3 class="mb-0">任务执行结果</h3>
     <hr>
-    <div id="taskResults" class="mt-3"></div>
+    <div class="collapse show" id="taskResultsContent">
+        <div id="taskResults" class="mt-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>自动任务的执行日志</span>
+                    <div>
+                        <button id="refreshLogsBtn" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#logContentContainer" aria-expanded="false" aria-controls="logContentContainer">
+                            展开/收起
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse" id="logContentContainer">
+                    <div class="card-body p-0">
+                        <div id="logContent" class="log-content" style="height: 300px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em; padding: 1rem; background-color: #000; color: #00ff00;">
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- 任务内容 -->
     <h3 class="mb-0">任务列表</h3>
     <hr>
@@ -62,7 +86,6 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-primary" id="saveAddTaskBtn">保存</button>
             </div>
         </div>
@@ -111,7 +134,6 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-primary" id="saveEditTaskBtn">保存</button>
             </div>
         </div>
@@ -912,7 +934,48 @@
         modal.show();
     }
     
+    // 获取并显示任务执行结果日志
+    async function fetchTaskResults() {
+        try {
+            const response = await fetch('/api/task/get_task_results');
+            const result = await response.json();
+            
+            if (result.success) {
+                const logContent = document.getElementById('logContent');
+                if (logContent) {
+                    logContent.textContent = result.data || '暂无日志内容';
+                    // 滚动到底部
+                    logContent.scrollTop = logContent.scrollHeight;
+                }
+            } else {
+                const logContent = document.getElementById('logContent');
+                if (logContent) {
+                    logContent.textContent = '获取日志失败: ' + result.message;
+                }
+            }
+        } catch (error) {
+            console.error('获取任务执行结果失败:', error);
+            const logContent = document.getElementById('logContent');
+            if (logContent) {
+                logContent.textContent = '获取日志失败: ' + error.message;
+            }
+        }
+    }
+    
+    // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', function() {
+        // 获取任务执行结果日志
+        fetchTaskResults();
+        
+        // 绑定刷新按钮事件
+        const refreshBtn = document.getElementById('refreshLogsBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                fetchTaskResults();
+                showToast('自动任务的执行日志已刷新', 'success');
+            });
+        }
+        
         // 页面加载时获取任务列表
         fetchTasks();
         

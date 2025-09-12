@@ -8,9 +8,6 @@ app = Flask(__name__,
             template_folder=os.path.join(os.getcwd(), 'ui', 'templates'),
             static_folder=os.path.join(os.getcwd(), 'ui'))
 
-# 静态资源默认缓存时间（秒），减小重复请求
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 60 * 60 * 24 * 30  # 30天
-
 # 配置文件路径
 CONFIG_FILE = os.path.join('data', 'config.yaml')
 
@@ -102,9 +99,23 @@ def save_user_rules():
     """保存用户规则"""
     try:
         rules_data = request.json
-        # 直接使用规则列表数据
         qbhper.save_user_rules(rules_data)
         return jsonify({'success': True, 'message': '用户规则保存成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/task/get_task_results', methods=['GET'])
+def get_task_results():
+    """获取任务执行结果日志"""
+    try:
+        log_file_path = os.path.join('data', 'auto_task_results.log')
+        if os.path.exists(log_file_path):
+            with open(log_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return jsonify({'success': True, 'data': content})
+        else:
+            return jsonify({'success': True, 'data': ''})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
