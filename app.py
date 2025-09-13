@@ -34,6 +34,12 @@ def tasks():
     return render_template('tasks.html')
 
 
+@app.route('/rules')
+def rules():
+    """返回规则页面"""
+    return render_template('rules.html')
+
+
 @app.route('/settings')
 def settings():
     """返回设置页面"""
@@ -109,7 +115,7 @@ def save_user_rules():
 def get_task_results():
     """获取任务执行结果日志"""
     try:
-        log_file_path = os.path.join('data', 'auto_task_results.log')
+        log_file_path = os.path.join('data', 'task_results.log')
         if os.path.exists(log_file_path):
             with open(log_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -161,38 +167,10 @@ def execute_manual_task():
         data = request.json
         task_index = data.get('task_index')
         
-        # 获取用户任务
-        user_tasks = qbhper.get_user_tasks()
-        tasks = user_tasks.get('tasks', [])
+        # 调用qbit_helper中的方法执行手动任务
+        result = qbhper.execute_manual_task(task_index)
         
-        # 验证任务索引
-        if task_index < 0 or task_index >= len(tasks):
-            return jsonify({'success': False, 'message': '任务索引无效'}), 400
-        
-        # 获取任务信息
-        task = tasks[task_index]
-        task_name = task.get('task_name', '未命名任务')
-        rules_string = task.get('rules', '')
-        
-        # 解析规则字符串
-        if rules_string:
-            rule_names = rules_string.split('|')
-            # 获取所有用户规则
-            all_rules = qbhper.get_user_rules()
-            # 筛选出匹配的规则
-            matched_rules = [rule for rule in all_rules if rule.get('rule_name') in rule_names]
-        else:
-            matched_rules = []
-        
-        qbhper.logger.info(f'执行手动任务："{task_name}"，规则：{[rule.get("rule_name") for rule in matched_rules]}')
-        results = qbhper.opt_all_torrent(matched_rules)
-        
-        # 返回执行结果
-        return jsonify({
-            'success': True,
-            'message': f'手动任务 "{task_name}" 执行完成',
-            'data': results
-        })
+        return jsonify(result)
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'执行手动任务时发生错误: {str(e)}'}), 500

@@ -5,13 +5,11 @@
 {% block content %}
 <div id="tasks" class="tab-content">
     <!-- 任务结果 -->
-    <h3 class="mb-0">任务执行结果</h3>
-    <hr>
     <div class="collapse show" id="taskResultsContent">
         <div id="taskResults" class="mt-3">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>自动任务的执行日志</span>
+                    <span>任务执行日志</span>
                     <div>
                         <button id="refreshLogsBtn" class="btn btn-sm btn-outline-primary me-2">
                             <i class="bi bi-arrow-clockwise"></i> 刷新
@@ -493,11 +491,10 @@
             const result = await response.json();
             
             if (result.success) {
-                showToast(`手动任务 "${task.task_name || '未命名任务'}" 执行完成`, 'success');
                 console.log('手动任务执行结果:', result.data);
-                
-                // 显示详细的执行结果
-                displayTaskResult(index, task.task_name || '未命名任务', result.data);
+                // 刷新日志以显示最新结果
+                await fetchTaskResults();
+                showToast(`手动任务 "${task.task_name || '未命名任务'}" 执行完成`, 'success');
             } else {
                 showToast(`手动任务执行失败: ${result.message}`, 'danger');
                 console.error('手动任务执行失败:', result.message);
@@ -508,120 +505,6 @@
         }
     }
     
-    // 显示任务执行结果
-    function displayTaskResult(index, taskName, data) {
-        const taskResultsDiv = document.getElementById('taskResults');
-        
-        // 创建结果容器
-        const resultContainer = document.createElement('div');
-        resultContainer.className = 'task-result-item mb-3 p-3 border rounded position-relative';
-        
-        // 创建删除按钮
-        const deleteButton = document.createElement('button');
-        deleteButton.className = 'btn btn-outline-danger position-absolute top-0 end-0 m-2 py-1 px-2';
-        deleteButton.setAttribute('aria-label', '删除');
-        deleteButton.innerHTML = '<i class="bi bi-trash"></i>';
-        deleteButton.addEventListener('click', function() {
-            resultContainer.remove();
-        });
-        resultContainer.appendChild(deleteButton);
-        
-        // 获取当前时间戳
-        const timestamp = new Date().toLocaleString('zh-CN');
-        
-        // 创建结果内容
-        const resultContent = document.createElement('div');
-        
-        // 添加时间戳、任务名称和执行结果统计信息
-        const headerElement = document.createElement('div');
-        if (!data) {
-            headerElement.innerHTML = `${timestamp} &nbsp;&nbsp; <strong>${taskName}</strong> &nbsp;&nbsp; 执行结果：无执行结果数据`;
-        } else {
-            headerElement.innerHTML = `${timestamp} &nbsp;&nbsp; <strong>${taskName}</strong> &nbsp;&nbsp; 执行结果：✅ 成功：${data.processed_count || 0} &nbsp;&nbsp;&nbsp;&nbsp;⏭ 跳过：${data.skipped_count || 0} &nbsp;&nbsp;&nbsp;&nbsp;❌ 失败：${data.failed_count || 0}`;
-        }
-        resultContent.appendChild(headerElement);
-            
-        // 添加成功详情
-        if (data && data.processed_details && data.processed_details.length > 0) {
-            const successHeader = document.createElement('div');
-            successHeader.innerHTML = '✅ <strong>成功详情：</strong>';
-            resultContent.appendChild(successHeader);
-            
-            const successList = document.createElement('ul');
-            data.processed_details.forEach(detail => {
-                const listItem = document.createElement('li');
-                listItem.textContent = detail;
-                successList.appendChild(listItem);
-            });
-            resultContent.appendChild(successList);
-        }
-        
-        // 添加失败详情
-        if (data && data.failed_details && data.failed_details.length > 0) {
-            const failHeader = document.createElement('div');
-            failHeader.innerHTML = '❌ <strong>失败详情：</strong>';
-            resultContent.appendChild(failHeader);
-            
-            const failList = document.createElement('ul');
-            data.failed_details.forEach(detail => {
-                const listItem = document.createElement('li');
-                listItem.textContent = detail;
-                failList.appendChild(listItem);
-            });
-            resultContent.appendChild(failList);
-        }
-        
-        resultContainer.appendChild(resultContent);
-        
-        // 将结果添加到taskResults div的顶部
-        taskResultsDiv.insertBefore(resultContainer, taskResultsDiv.firstChild);
-    }
-
-    // 启用/禁用自动任务
-    async function toggleAutoTask(index, task) {
-        // 获取开关的当前状态
-        const toggleSwitch = document.querySelector(`#toggle-switch-${index}`);
-        const newStatus = toggleSwitch ? toggleSwitch.checked : false;
-        
-        showToast(`正在${newStatus ? '启用' : '禁用'}自动任务: ${task.task_name || '未命名任务'}`, 'info');
-        
-        try {
-            // 调用后端API切换自动任务状态
-            const response = await fetch('/api/task/toggle_auto_task', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    task_index: index, 
-                    enable: newStatus 
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                showToast(result.message, 'success');
-                // 重新加载任务列表以更新状态显示
-                fetchTasks();
-            } else {
-                // 如果失败，恢复开关状态
-                if (toggleSwitch) {
-                    $(toggleSwitch).bootstrapToggle('toggle');
-                }
-                showToast(`切换自动任务状态失败: ${result.message}`, 'danger');
-                console.error('切换自动任务状态失败:', result.message);
-            }
-        } catch (error) {
-            // 如果失败，恢复开关状态
-            if (toggleSwitch) {
-                $(toggleSwitch).bootstrapToggle('toggle');
-            }
-            console.error('切换自动任务状态时发生错误:', error);
-            showToast(`切换自动任务状态时发生错误: ${error.message}`, 'danger');
-        }
-    }
-
     // 删除任务
     async function deleteTask(index, task) {
         showConfirm(`确定要删除任务 "${task.task_name || '未命名任务'}" 吗？`, async function(confirmed) {
@@ -694,44 +577,7 @@
         const selectedRules = Array.from(checkboxes).map(cb => cb.value);
         const rulesString = selectedRules.join('|');
         
-        // 如果任务名为空，则自动填充带索引的默认任务名
-        if (!taskName) {
-            try {
-                // 获取当前任务列表以确定下一个索引号
-                const response = await fetch('/api/config/get_user_tasks');
-                const result = await response.json();
-                
-                if (result.success) {
-                // 正确处理返回的任务数据结构
-                const tasksData = result.data || {};
-                const tasks = tasksData.tasks || [];
-                // 计算下一个未命名任务的索引
-                let nextIndex = 1;
-                const existingUnnamedTasks = tasks.filter(t => t.task_name && t.task_name.startsWith('未命名任务'));
-                if (existingUnnamedTasks.length > 0) {
-                    // 提取所有索引号
-                    const indices = existingUnnamedTasks.map(t => {
-                        const match = t.task_name.match(/^未命名任务(\d+)$/);
-                        return match ? parseInt(match[1]) : 0;
-                    }).filter(n => n > 0);
-                    
-                    // 找到最大索引号
-                    const maxIndex = indices.length > 0 ? Math.max(...indices) : 0;
-                    nextIndex = maxIndex + 1;
-                }
-                taskName = `未命名任务${nextIndex}`;
-                } else {
-                    // 如果获取失败，默认使用未命名任务1
-                    taskName = '未命名任务1';
-                }
-            } catch (error) {
-                console.error('获取任务列表失败:', error);
-                // 如果获取失败，默认使用未命名任务1
-                taskName = '未命名任务1';
-            }
-        }
-        
-        // 构造任务对象
+        // 构造任务对象（不包含index）
         const task = {
             'task_name': taskName,
             'task_type': taskType,
@@ -809,42 +655,7 @@
         const selectedRules = Array.from(checkboxes).map(cb => cb.value);
         const rulesString = selectedRules.join('|');
         
-        // 如果任务名为空，则自动填充带索引的默认任务名
-        if (!taskName) {
-            try {
-                // 获取当前任务列表以确定下一个索引号
-                const response = await fetch('/api/config/get_user_tasks');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const tasks = result.data?.tasks || [];
-                    // 计算下一个未命名任务的索引
-                    let nextIndex = 1;
-                    const existingUnnamedTasks = tasks.filter(t => t.task_name && t.task_name.startsWith('未命名任务'));
-                    if (existingUnnamedTasks.length > 0) {
-                        // 提取所有索引号
-                        const indices = existingUnnamedTasks.map(t => {
-                            const match = t.task_name.match(/^未命名任务(\d+)$/);
-                            return match ? parseInt(match[1]) : 0;
-                        }).filter(n => n > 0);
-                        
-                        // 找到最大索引号
-                        const maxIndex = indices.length > 0 ? Math.max(...indices) : 0;
-                        nextIndex = maxIndex + 1;
-                    }
-                    taskName = `未命名任务${nextIndex}`;
-                } else {
-                    // 如果获取失败，默认使用未命名任务1
-                    taskName = '未命名任务1';
-                }
-            } catch (error) {
-                console.error('获取任务列表失败:', error);
-                // 如果获取失败，默认使用未命名任务1
-                taskName = '未命名任务1';
-            }
-        }
-        
-        // 构造任务对象
+        // 构造任务对象（不包含index）
         const task = {
             'task_name': taskName,
             'task_type': taskType,

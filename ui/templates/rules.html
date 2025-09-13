@@ -1,0 +1,514 @@
+{% extends "layout.html" %}
+
+{% block title %}规则 - QBitTorrent Helper{% endblock %}
+
+{% block content %}
+<div id="rules" class="tab-content">
+    <!-- 规则内容 -->
+    <h3 class="mb-0">规则</h3>
+    <hr>
+    <div class="ms-3 my-3"> 
+        <div class="mb-3">
+            <button type="button" class="btn btn-primary me-3" data-bs-toggle="modal" data-bs-target="#addRuleModal">新增规则</button>
+            <button type="button" class="btn btn-secondary me-3" id="reloadRulesBtn">重载规则</button>
+        </div>
+        <div id="rulesContainer">
+            <!-- 规则卡片将通过JavaScript动态渲染 -->
+        </div>
+    </div>
+
+    <!-- 新增规则模态框 -->
+<div class="modal fade" id="addRuleModal" tabindex="-1" aria-labelledby="addRuleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addRuleModalLabel">新增规则</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addRuleForm">
+                    <div class="mb-3">
+                            <label for="ruleType" class="form-label">新增规则</label>
+                        <select class="form-select" id="ruleType">
+                                <option value="tag">处理标签</option>
+                                <option value="tracker">处理跟踪器</option>
+                                <option value="duplicate_tag">标记辅种</option>
+                        </select>
+                    </div>
+                        
+                    <div class="mb-3">
+                        <label for="newRuleName" class="form-label">规则名称</label>
+                        <input type="text" class="form-control" id="newRuleName" placeholder="请输入规则名称">
+                    </div>
+                        
+                    <div class="mb-3" id="operationTypeGroup">
+                        <label for="newOperationType" class="form-label">操作类型</label>
+                        <select class="form-select" id="newOperationType">
+                            <option value="add">添加</option>
+                                <option value="delete">删除</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rulePriority" class="form-label">优先级 (1-99, 值越小优先级越高)</label>
+                        <input type="number" class="form-control" id="rulePriority" min="1" max="99" placeholder="请输入优先级 (1-99)">
+                    </div>
+                    <div id="tagRuleFields">
+                        <div class="mb-3">
+                                <label for="trackerMatchCondition" class="form-label">匹配条件 - 跟踪器关键字</label>
+                                <input type="text" class="form-control" id="trackerMatchCondition" placeholder="多个参数用"|"分隔：keyword1|keyword2|...">
+                        </div>
+                            
+                        <div class="mb-3">
+                            <label for="tagToOperate" class="form-label">要添加或删除的标签</label>
+                                <input type="text" class="form-control" id="tagToOperate" placeholder="请输入要添加或删除的标签">
+                            </div>
+                        </div>
+                        
+                        <div class="tracker-rule-fields" id="trackerRuleFields" style="display: none;">
+                        <div class="mb-3">
+                                <label for="tagMatchCondition" class="form-label">匹配条件 - 标签</label>
+                                <input type="text" class="form-control" id="tagMatchCondition" placeholder="多个参数用"|"分隔：tag1|tag2|...">
+                        </div>
+                            
+                        <div class="mb-3">
+                                <label for="trackerMatchCondition2" class="form-label">匹配条件 - 跟踪器关键字</label>
+                                <input type="text" class="form-control" id="trackerMatchCondition2" placeholder="多个参数用"|"分隔：keyword1|keyword2|...">
+                        </div>
+                            
+                        <div class="mb-3">
+                                <label for="trackerUrlToOperate" class="form-label">要添加或删除的跟踪器URL</label>
+                                <input type="text" class="form-control" id="trackerUrlToOperate" placeholder="输入完整的跟踪器URL：https://example.com/announce.php?xxxxxxx">
+                        </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="saveRuleBtn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/ui/js/scripts.js"></script>
+<script>
+    // 页面加载时获取规则并渲染规则卡片
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchRules();
+    });
+    
+    // 处理新增规则按钮点击事件
+    const addRuleButton = document.querySelector('.d-flex.justify-content-between.align-items-center.mb-3 .btn-primary');
+    if (addRuleButton) {
+        addRuleButton.addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('addRuleModal'));
+            modal.show();
+        });
+    }
+    
+    // 处理规则类型切换时的表单显示
+    const ruleTypeSelect = document.getElementById('ruleType');
+    if (ruleTypeSelect) {
+        ruleTypeSelect.addEventListener('change', function() {
+            const tagRuleFields = document.getElementById('tagRuleFields');
+            const trackerRuleFields = document.getElementById('trackerRuleFields');
+            const priorityField = document.querySelector('.mb-3 [id="rulePriority"]').parentElement;
+            
+            if (this.value === 'tag') {
+                tagRuleFields.style.display = 'block';
+                trackerRuleFields.style.display = 'none';
+                priorityField.style.display = 'block';
+            } else if (this.value === 'tracker') {
+                tagRuleFields.style.display = 'none';
+                trackerRuleFields.style.display = 'block';
+                priorityField.style.display = 'block';
+            } else if (this.value === 'duplicate_tag') {
+                // 对于标记辅种规则，隐藏所有特定字段和操作类型选择框
+                tagRuleFields.style.display = 'none';
+                trackerRuleFields.style.display = 'none';
+                document.getElementById('operationTypeGroup').style.display = 'none';
+                priorityField.style.display = 'none';
+            }
+        });
+    }
+    
+    // 处理保存规则按钮点击事件
+    const saveRuleBtn = document.getElementById('saveRuleBtn');
+    if (saveRuleBtn) {
+        saveRuleBtn.addEventListener('click', async function() {
+            // 获取表单数据
+            const ruleType = document.getElementById('ruleType').value;
+            let ruleName = document.getElementById('newRuleName').value;
+            const optType = document.getElementById('newOperationType').value;
+            const priority = parseInt(document.getElementById('rulePriority').value) || 99;
+            
+            // 构造规则对象
+            let rule = {
+                'rule_name': ruleName,
+                'rule_type': ruleType === 'tag' ? 'tag_opt' : (ruleType === 'duplicate_tag' ? 'duplicate_tag_opt' : 'tracker_opt'),
+                'priority': priority
+            };
+            
+            // 只有非标记辅种规则才添加opt_type字段
+            if (ruleType !== 'duplicate_tag') {
+                rule['opt_type'] = optType;
+            }
+            
+            // 根据规则类型添加特定字段
+            if (ruleType === 'tag') {
+                rule['trackers'] = document.getElementById('trackerMatchCondition').value;
+                rule['tag'] = document.getElementById('tagToOperate').value;
+            } else if (ruleType === 'tracker') {
+                rule['tags'] = document.getElementById('tagMatchCondition').value;
+                rule['trackers'] = document.getElementById('trackerMatchCondition2').value;
+                rule['tracker'] = document.getElementById('trackerUrlToOperate').value;
+            }
+            // 对于标记辅种规则，不需要添加特定字段
+            
+            // 如果是标记辅种规则，隐藏操作类型选择框
+            if (ruleType === 'duplicate_tag') {
+                document.getElementById('operationTypeGroup').style.display = 'none';
+            } else {
+                // 其他规则类型显示操作类型选择框
+                document.getElementById('operationTypeGroup').style.display = 'block';
+            }
+            
+            try {
+                // 获取当前规则
+                console.log('发送请求: GET /api/config/get_user_rules');
+                const response = await fetch('/api/config/get_user_rules');
+                console.log('请求完成: /api/config/get_user_rules, 状态:', response.status);
+                const result = await response.json();
+                console.log('响应数据: /api/config/get_user_rules, 结果:', result);
+                
+                if (result.success) {
+                    // 直接使用返回的规则数据
+                    const rules = result.data || [];
+                    
+                    // 检查是否处于编辑模式
+                    const modal = document.getElementById('addRuleModal');
+                    const editingIndex = modal.dataset.editingIndex;
+                    
+                    if (editingIndex !== undefined && editingIndex !== '') {
+                        // 编辑模式 - 更新现有规则
+                        rules[parseInt(editingIndex)] = rule;
+                        // 清除编辑索引
+                        delete modal.dataset.editingIndex;
+                    } else {
+                        // 添加模式 - 添加新规则
+                        rules.push(rule);
+                    }
+                    
+                    // 保存配置
+                    console.log('发送请求: POST /api/config/save_user_rules, 数据:', rules);
+                    const saveResponse = await fetch('/api/config/save_user_rules', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(rules)
+                    });
+                    
+                    console.log('请求完成: /api/config/save_user_rules, 状态:', saveResponse.status);
+                    const saveResult = await saveResponse.json();
+                    console.log('响应数据: /api/config/save_user_rules, 结果:', saveResult);
+                    
+                    if (saveResult.success) {
+                        // 关闭模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addRuleModal'));
+                        modal.hide();
+                        // 重新加载规则
+                        fetchRules();
+                        showToast('规则保存成功');
+                    } else {
+                        showToast('规则保存失败: ' + saveResult.message, 'danger');
+                    }
+                } else {
+                    showToast('获取配置失败: ' + result.message, 'danger');
+                }
+            } catch (error) {
+                console.error('保存规则失败:', error);
+                showToast('保存规则失败: ' + error.message, 'danger');
+            }
+        });
+    }
+    
+    // 处理模态框隐藏事件，确保正确清理背景遮罩
+    const addRuleModal = document.getElementById('addRuleModal');
+    if (addRuleModal) {
+        addRuleModal.addEventListener('hidden.bs.modal', function (e) {
+            // 清空表单数据
+            document.getElementById('addRuleForm').reset();
+            // 重置表单显示
+            document.getElementById('tagRuleFields').style.display = 'block';
+            document.getElementById('trackerRuleFields').style.display = 'none';
+            // 确保移除模态框背景遮罩
+            document.body.classList.remove('modal-open');
+            const modalBackdrop = document.querySelector('.modal-backdrop');
+            if (modalBackdrop) {
+                modalBackdrop.remove();
+            }
+        });
+    }
+    
+    // 绑定重载规则按钮事件
+    const reloadRulesBtn = document.getElementById('reloadRulesBtn');
+    if (reloadRulesBtn) {
+        reloadRulesBtn.addEventListener('click', async function() {
+            try {
+                console.log('发送请求: GET /api/config/get_user_rules');
+                const response = await fetch('/api/config/get_user_rules', {
+                    method: 'GET'
+                });
+                console.log('请求完成: /api/config/get_user_rules, 状态:', response.status);
+                const result = await response.json();
+                console.log('响应数据: /api/config/get_user_rules, 结果:', result);
+                
+                if (result.success) {
+                    showToast('规则重载成功');
+                    // 重新加载规则数据
+                    fetchRules();
+                } else {
+                    showToast('规则重载失败: ' + result.message, 'danger');
+                }
+            } catch (error) {
+                console.error('重载规则失败:', error);
+                showToast('重载规则失败: ' + error.message, 'danger');
+            }
+        });
+    }
+        
+    async function fetchRules() {
+        try {
+            console.log('[Frontend Log] Sending GET request to /api/config/get_user_rules');
+            const response = await fetch('/api/config/get_user_rules');
+            console.log('[Frontend Log] Received response from /api/config/get_user_rules with status: ' + response.status);
+            const result = await response.json();
+            console.log('[Frontend Log] Parsed JSON response:', result);
+            
+            if (result.success) {
+                // 渲染规则卡片
+                renderRuleCards(result.data || []);
+            } else {
+                // 即使获取失败也显示规则区域，但可能为空
+                renderRuleCards([]);
+            }
+        } catch (error) {
+            console.error('获取规则失败:', error);
+            // 即使获取失败也显示规则区域，但可能为空
+            renderRuleCards([]);
+        }
+    }
+
+    // 渲染规则卡片
+    function renderRuleCards(rules) {
+        const rulesContainer = document.getElementById('rulesContainer');
+        if (!rulesContainer) return;
+        
+        // 清空现有内容
+        rulesContainer.innerHTML = '';
+        
+        // 如果没有规则，显示提示信息
+        if (!rules || rules.length === 0) {
+            rulesContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">暂无规则配置</div>
+                </div>
+            `;
+            return;
+        }
+        
+        // 创建一个row容器来包装规则卡片
+        const rowContainer = document.createElement('div');
+        rowContainer.className = 'row';
+        
+        // 遍历规则并创建卡片
+        rules.forEach((rule, index) => {
+            const ruleCard = createRuleCard(rule, index);
+            rowContainer.appendChild(ruleCard);
+        });
+        
+        rulesContainer.appendChild(rowContainer);
+    }
+
+    // 创建单个规则卡片
+    function createRuleCard(rule, index) {
+        const card = document.createElement('div');
+        card.className = 'col-md-5 m-4 rule-card border-0';
+        
+        const cardHeader = document.createElement('div');
+        cardHeader.className = `card-header ${rule.rule_type === 'tag_opt' ? 'bg-primary' : 'bg-success'} text-white d-flex justify-content-between align-items-center`;
+        
+        const headerTitle = document.createElement('span');
+            headerTitle.textContent = rule.rule_type === 'tag_opt' ? '标签规则' : (rule.rule_type === 'duplicate_tag_opt' ? '标记辅种规则' : '跟踪器规则');
+        
+        const buttonGroup = document.createElement('div');
+        
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-sm btn-outline-light me-2';
+        editButton.textContent = '编辑';
+        
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-sm btn-outline-light';
+        deleteButton.textContent = '删除';
+        
+        // 添加编辑按钮点击事件
+        editButton.addEventListener('click', function() {
+            // 记录当前编辑的规则索引
+            document.getElementById('addRuleModal').dataset.editingIndex = index;
+            
+            // 填充表单数据
+            document.getElementById('ruleType').value = rule.rule_type === 'tag_opt' ? 'tag' : (rule.rule_type === 'duplicate_tag_opt' ? 'duplicate_tag' : 'tracker');
+            document.getElementById('newRuleName').value = rule.rule_name || '';
+            document.getElementById('newOperationType').value = rule.opt_type || 'add';
+            document.getElementById('rulePriority').value = rule.priority || '';
+            
+            // 根据规则类型显示相应的表单字段
+            const tagRuleFields = document.getElementById('tagRuleFields');
+            const trackerRuleFields = document.getElementById('trackerRuleFields');
+            
+            if (rule.rule_type === 'tag_opt') {
+                    tagRuleFields.style.display = 'block';
+                    trackerRuleFields.style.display = 'none';
+                    document.getElementById('trackerMatchCondition').value = rule.trackers || '';
+                    document.getElementById('tagToOperate').value = rule.tag || '';
+                } else if (rule.rule_type === 'tracker_opt') {
+                    tagRuleFields.style.display = 'none';
+                    trackerRuleFields.style.display = 'block';
+                    document.getElementById('tagMatchCondition').value = rule.tags || '';
+                    document.getElementById('trackerMatchCondition2').value = rule.trackers || '';
+                    document.getElementById('trackerUrlToOperate').value = rule.tracker || '';
+                } else if (rule.rule_type === 'duplicate_tag_opt') {
+                    // 对于标记辅种规则，隐藏所有特定字段和操作类型选择框
+                    tagRuleFields.style.display = 'none';
+                    trackerRuleFields.style.display = 'none';
+                    document.getElementById('operationTypeGroup').style.display = 'none';
+                }
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('addRuleModal'));
+            modal.show();
+        });
+        
+        // 添加删除按钮点击事件
+        deleteButton.addEventListener('click', async function() {
+            showConfirm(`确定要删除规则 "${rule.rule_name || '未命名规则'}" 吗？`, async function(confirmed) {
+                if (!confirmed) {
+                    return;
+                }
+                
+                try {
+                    // 获取当前规则
+                    console.log('[Frontend Log] Sending GET request to /api/config/get_user_rules (deleteButton)');
+                    const response = await fetch('/api/config/get_user_rules');
+                    console.log(`[Frontend Log] Received response from /api/config/get_user_rules (deleteButton) with status: ${response.status}`);
+                    const result = await response.json();
+                    console.log('[Frontend Log] Parsed JSON response (deleteButton):', result);
+                    
+                    if (result.success) {
+                        // 直接使用返回的规则数据
+                        const rules = result.data || [];
+                        
+                        // 从规则数组中删除指定索引的规则
+                        rules.splice(index, 1);
+                        
+                        // 保存更新后的配置
+                        console.log('[Frontend Log] Sending POST request to /api/config/save_user_rules (deleteButton), Data:', rules);
+                        const saveResponse = await fetch('/api/config/save_user_rules', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(rules)
+                        });
+                        console.log(`[Frontend Log] Received response from /api/config/save_user_rules (deleteButton) with status: ${saveResponse.status}`);
+                        const saveResult = await saveResponse.json();
+                        console.log('[Frontend Log] Parsed JSON response (deleteButton):', saveResult);
+                        
+                        if (saveResult.success) {
+                            showToast('规则删除成功');
+                            // 重新加载规则
+                            fetchRules();
+                        } else {
+                            showToast('规则删除失败: ' + saveResult.message, 'danger');
+                        }
+                    } else {
+                        showToast('获取配置失败: ' + result.message, 'danger');
+                    }
+                } catch (error) {
+                    console.error('删除规则失败:', error);
+                    showToast('删除规则失败: ' + error.message, 'danger');
+                }
+            });
+        });
+        
+        buttonGroup.appendChild(editButton);
+        buttonGroup.appendChild(deleteButton);
+        
+        cardHeader.appendChild(headerTitle);
+        cardHeader.appendChild(buttonGroup);
+        
+        const table = document.createElement('table');
+        table.className = 'table mb-0';
+        
+        const tbody = document.createElement('tbody');
+        
+        // 规则名称行
+        const nameRow = document.createElement('tr');
+        nameRow.innerHTML = `<td>规则名称</td><td>${rule.rule_name || '未命名规则'}</td>`;
+        tbody.appendChild(nameRow);
+        
+        // 优先级行
+        const priorityRow = document.createElement('tr');
+        priorityRow.innerHTML = `<td>优先级</td><td>${rule.priority || 99}</td>`;
+        tbody.appendChild(priorityRow);
+        
+        // 操作类型行
+        const optTypeRow = document.createElement('tr');
+        optTypeRow.innerHTML = `<td>操作类型</td><td>${rule.opt_type || 'N/A'}</td>`;
+        tbody.appendChild(optTypeRow);
+        
+        // 根据规则类型添加特定行
+        if (rule.rule_type === 'tag_opt') {
+            // 跟踪器匹配条件行
+            const trackersRow = document.createElement('tr');
+            trackersRow.innerHTML = `<td>匹配条件 - 跟踪器关键字</td><td>${rule.trackers || 'N/A'}</td>`;
+            tbody.appendChild(trackersRow);
+            
+            // 标签行
+            const tagRow = document.createElement('tr');
+            tagRow.innerHTML = `<td>要添加或删除的标签</td><td>${rule.tag || 'N/A'}</td>`;
+            tbody.appendChild(tagRow);
+        } else if (rule.rule_type === 'tracker_opt') {
+            // 标签匹配条件行
+            const tagsRow = document.createElement('tr');
+            tagsRow.innerHTML = `<td>匹配条件 - 标签关键字</td><td>${rule.tags || 'N/A'}</td>`;
+            tbody.appendChild(tagsRow);
+            
+            // 跟踪器匹配条件行
+            const trackersRow = document.createElement('tr');
+            trackersRow.innerHTML = `<td>匹配条件 - 跟踪器关键字</td><td>${rule.trackers || 'N/A'}</td>`;
+            tbody.appendChild(trackersRow);
+            
+            // 跟踪器URL行
+            const trackerRow = document.createElement('tr');
+            trackerRow.innerHTML = `<td>要添加或删除的跟踪器URL</td><td>${rule.tracker || 'N/A'}</td>`;
+            tbody.appendChild(trackerRow);
+        }
+        
+        table.appendChild(tbody);
+        
+        // 创建卡片主体
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body p-0';
+        cardBody.appendChild(table);
+        
+        // 组装卡片
+        card.appendChild(cardHeader);
+        card.appendChild(cardBody);
+        
+        return card;
+    }
+</script>
+{% endblock %}

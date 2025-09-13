@@ -131,31 +131,102 @@ class QBitHelperBasic:
         # new_config 应该是一个规则列表
         rules_list = new_config if isinstance(new_config, list) else new_config.get('rules', [])
         
+        # 查找可用的最小正整数索引
+        def find_available_index(existing_indices):
+            if not existing_indices:
+                return 1
+            
+            # 对现有索引进行排序
+            sorted_indices = sorted(existing_indices)
+            
+            # 查找第一个缺失的正整数
+            for i in range(1, max(sorted_indices) + 2):
+                if i not in sorted_indices:
+                    return i
+            return 1  # fallback
+        
         # 使用 OrderedDict 确保字段顺序固定
         ordered_rules = []
+        existing_indices = [rule.get('index') for rule in rules_list if isinstance(rule, dict) and rule.get('index') is not None]
+        
         for rule in rules_list:
             if isinstance(rule, dict):
                 ordered_rule = {}
                 # 按照固定顺序添加字段
-                field_order = ['rule_name', 'rule_type', 'priority', 'opt_type', 'trackers', 'tag', 'tags', 'tracker']
+                field_order = ['index', 'rule_name', 'rule_type', 'priority', 'opt_type', 'trackers', 'tag', 'tags', 'tracker']
+                
+                # 确定索引值
+                if 'index' in rule and rule['index'] is not None:
+                    # 保留现有索引
+                    index = rule['index']
+                else:
+                    # 生成新的索引
+                    index = find_available_index([r.get('index') for r in ordered_rules if isinstance(r, dict)])
+                
+                # 添加索引字段（完全由后端生成和管理）
+                ordered_rule['index'] = index
+                
+                # 如果规则名称为空，则设置默认名称
+                if not rule.get('rule_name'):
+                    rule['rule_name'] = f'规则{index}'
+                    
                 for field in field_order:
                     if field in rule:
                         ordered_rule[field] = rule[field]
-                # 添加其他可能存在的字段
+                # 添加其他可能存在的字段（除了index，index由后端控制）
                 for key, value in rule.items():
-                    if key not in ordered_rule:
+                    if key not in ordered_rule and key != 'index':
                         ordered_rule[key] = value
                 ordered_rules.append(ordered_rule)
             else:
+                # 如果规则不是字典类型，需要特殊处理
                 ordered_rules.append(rule)
         
+        # 重新分配索引以确保连续性
+        final_rules = []
+        used_indices = []
+        
+        for rule in ordered_rules:
+            if isinstance(rule, dict):
+                final_rule = {}
+                # 按照固定顺序添加字段
+                field_order = ['index', 'rule_name', 'rule_type', 'priority', 'opt_type', 'trackers', 'tag', 'tags', 'tracker']
+                
+                # 确定索引值
+                if 'index' in rule and rule['index'] is not None and rule['index'] not in used_indices:
+                    # 保留现有索引
+                    index = rule['index']
+                else:
+                    # 生成新的索引
+                    index = find_available_index(used_indices)
+                
+                # 添加索引字段（完全由后端生成和管理）
+                final_rule['index'] = index
+                used_indices.append(index)
+                
+                # 如果规则名称为空，则设置默认名称
+                if not rule.get('rule_name'):
+                    rule['rule_name'] = f'规则{index}'
+                    
+                for field in field_order:
+                    if field in rule:
+                        final_rule[field] = rule[field]
+                # 添加其他可能存在的字段（除了index，index由后端控制）
+                for key, value in rule.items():
+                    if key not in final_rule and key != 'index':
+                        final_rule[key] = value
+                final_rules.append(final_rule)
+            else:
+                # 如果规则不是字典类型，直接添加
+                final_rules.append(rule)
+        
         # 直接替换整个 user_rules 部分
-        self.config['user_rules'] = ordered_rules
+        self.config['user_rules'] = final_rules
         
         with open(self.config_data, 'w', encoding='utf-8') as f:
             yaml.safe_dump(self.config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         self.logger.info("用户规则已保存")
-
+        
     # 新增用户任务相关方法
     def get_user_tasks(self):
         """获取用户任务配置"""
@@ -167,22 +238,71 @@ class QBitHelperBasic:
         # new_config 应该包含一个 'tasks' 键，其值为任务列表
         tasks_list = new_config.get('tasks', [])
         
-        # 使用 OrderedDict 确保字段顺序固定
+        # 查找可用的最小正整数索引
+        def find_available_index(existing_indices):
+            if not existing_indices:
+                return 1
+            
+            # 对现有索引进行排序
+            sorted_indices = sorted(existing_indices)
+            
+            # 查找第一个缺失的正整数
+            for i in range(1, max(sorted_indices) + 2):
+                if i not in sorted_indices:
+                    return i
+            return 1  # fallback
+        
+        # 收集所有现有的有效索引
+        existing_indices = set()  # 使用set提高查找效率
+        for task in tasks_list:
+            if isinstance(task, dict) and 'index' in task and task['index'] is not None:
+                existing_indices.add(task['index'])
+        
+        # 为没有索引的任务分配索引
+        for task in tasks_list:
+            if isinstance(task, dict):
+                if 'index' not in task or task['index'] is None:
+                    task['index'] = find_available_index(existing_indices)
+                    existing_indices.add(task['index'])
+                # 如果任务名称为空，则设置默认名称
+                if not task.get('task_name'):
+                    task['task_name'] = f'任务{task["index"]}'
+        
+        # 重新整理任务列表，确保索引唯一且连续
+        used_indices = set()
         ordered_tasks = []
+        
         for task in tasks_list:
             if isinstance(task, dict):
                 ordered_task = {}
                 # 按照固定顺序添加字段
-                field_order = ['task_name', 'task_type', 'cron', 'rules', 'status']
+                field_order = ['index', 'task_name', 'task_type', 'cron', 'rules', 'status']
+                
+                # 处理索引
+                index = task['index']
+                # 如果索引已被使用，分配一个新的可用索引
+                if index in used_indices:
+                    index = find_available_index(used_indices)
+                    # 更新任务的索引
+                    task['index'] = index
+                
+                # 添加索引字段
+                ordered_task['index'] = index
+                used_indices.add(index)
+                
+                # 添加其他字段
                 for field in field_order:
-                    if field in task:
+                    if field in task and field != 'index':
                         ordered_task[field] = task[field]
+                
                 # 添加其他可能存在的字段
                 for key, value in task.items():
                     if key not in ordered_task:
                         ordered_task[key] = value
+                        
                 ordered_tasks.append(ordered_task)
             else:
+                # 如果任务不是字典类型，直接添加
                 ordered_tasks.append(task)
         
         # 直接替换整个 user_tasks 部分
@@ -305,7 +425,7 @@ class QBitHelperBasic:
                 self._auto_task_results = self._auto_task_results[:5]
                 
             # 记录自动任务结果到日志文件
-            self._log_auto_task_result(task_result)
+            self._log_task_result(task_result)
                 
         except Exception as e:
             self.logger.error(f"执行自动任务 {task.get('task_name', f'自动任务{index}')} 时发生错误: {str(e)}")
@@ -326,10 +446,10 @@ class QBitHelperBasic:
                 self._auto_task_results = self._auto_task_results[:5]
                 
             # 记录自动任务结果到日志文件（包括错误）
-            self._log_auto_task_result(task_result)
+            self._log_task_result(task_result)
     
-    def _log_auto_task_result(self, task_result):
-        """将自动任务结果记录到日志文件"""
+    def _log_task_result(self, task_result):
+        """将任务结果记录到日志文件"""
         try:
             # 确保data目录存在
             data_dir = 'data'
@@ -337,7 +457,7 @@ class QBitHelperBasic:
                 os.makedirs(data_dir)
             
             # 日志文件路径
-            log_file = os.path.join(data_dir, 'auto_task_results.log')
+            log_file = os.path.join(data_dir, 'task_results.log')
             
             # 构建日志条目
             timestamp = task_result.get('timestamp', time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -427,6 +547,58 @@ class QBitHelperBasic:
                 desp = f"任务名称: {task.get('task_name', '未命名')}\n错误信息: {str(e)}"
                 self.send_webhook_to_serverchan(title, desp)
 
+    def execute_manual_task(self, task_index):
+        """执行手动任务"""
+        try:
+            # 获取用户任务
+            user_tasks = self.get_user_tasks()
+            tasks = user_tasks.get('tasks', [])
+            
+            # 验证任务索引
+            if task_index < 0 or task_index >= len(tasks):
+                raise ValueError('任务索引无效')
+            
+            # 获取任务信息
+            task = tasks[task_index]
+            task_name = task.get('task_name', '未命名任务')
+            rules_string = task.get('rules', '')
+            
+            # 解析规则字符串
+            if rules_string:
+                rule_names = rules_string.split('|')
+                # 获取所有用户规则
+                all_rules = self.get_user_rules()
+                # 筛选出匹配的规则
+                matched_rules = [rule for rule in all_rules if rule.get('rule_name') in rule_names]
+            else:
+                matched_rules = []
+            
+            self.logger.info(f'执行手动任务："{task_name}"，规则：{[rule.get("rule_name") for rule in matched_rules]}')
+            results = self.opt_all_torrent(matched_rules)
+            
+            # 记录手动任务执行结果到日志文件
+            task_result = {
+                'task_name': task_name,
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'result': results
+            }
+            self._log_task_result(task_result)
+            
+            return {
+                'success': True,
+                'message': f'手动任务 "{task_name}" 执行完成',
+                'data': results
+            }
+
+            # 记录自动任务结果到日志文件（包括错误）
+            self._log_task_result(task_result)
+            
+        except Exception as e:
+            self.logger.error(f"执行手动任务时发生错误: {str(e)}")
+            # 记录自动任务结果到日志文件（包括错误）
+            self._log_task_result(task_result)
+            raise
+    
     def send_webhook_to_serverchan(self, title: str, desp: str, tags: Optional[str] = None) -> bool:
         """发送消息到Server酱"""
         try:
