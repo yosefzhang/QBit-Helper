@@ -696,7 +696,7 @@ class QBitHelperBasic:
         return dashinfo
 
     def duplicate_tag_opt_single_torrent_single_rule(self, torrent, rule) -> Dict[str, str]:
-        """给单个种子打辅种标签
+        """给单个种子打辅种标签或移除辅种标签
         Args:
             torrent: 种子对象
             rule: 规则对象
@@ -708,10 +708,13 @@ class QBitHelperBasic:
             'detail': ''
         }
         try:
+            # 获取操作类型
+            opt_type = rule.get('opt_type', 'add')
+            
             # 获取当前种子的标识符
             identifier = f"{torrent.save_path}_{torrent.name}_{torrent.size}"
             
-            # 检查该标识符是否在torrent_dict中且有重复
+            # 复用现有逻辑检查该标识符是否在torrent_dict中且有重复
             if identifier in self.torrent_dict and len(self.torrent_dict[identifier]) > 1:
                 # 计算辅种数
                 duplicate_count = len(self.torrent_dict[identifier])
@@ -719,21 +722,38 @@ class QBitHelperBasic:
                 
                 self.logger.debug(f"发现重复内容的文件：{identifier}，辅种数：{duplicate_count}")
                 
-                # 检查当前种子是否已包含该标签
-                if duplicate_tag not in torrent.tags:
-                    # 为当前种子添加辅种标签
-                    self.qbit_client.torrents_add_tags(tags=duplicate_tag, torrent_hashes=torrent.hash)
-                    self.logger.info(f"为种子 {torrent.name} 添加辅种标签：{duplicate_tag}")
-                    result['status'] = 'processed'
-                    result['detail'] = f'为种子 {torrent.name} 添加辅种标签：{duplicate_tag}'
+                if opt_type == 'add':
+                    # 检查当前种子是否已包含该标签
+                    if duplicate_tag not in torrent.tags:
+                        # 为当前种子添加辅种标签
+                        self.qbit_client.torrents_add_tags(tags=duplicate_tag, torrent_hashes=torrent.hash)
+                        self.logger.info(f"为种子 {torrent.name} 添加辅种标签：{duplicate_tag}")
+                        result['status'] = 'processed'
+                        result['detail'] = f'为种子 {torrent.name} 添加辅种标签：{duplicate_tag}'
+                    else:
+                        self.logger.info(f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加")
+                        result['status'] = 'skipped'
+                        result['detail'] = f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加"
+                elif opt_type == 'remove':
+                    # 检查当前种子是否包含辅种标签
+                    if duplicate_tag in torrent.tags:
+                        # 为当前种子移除辅种标签
+                        self.qbit_client.torrents_remove_tags(tags=duplicate_tag, torrent_hashes=torrent.hash)
+                        self.logger.info(f"为种子 {torrent.name} 移除辅种标签：{duplicate_tag}")
+                        result['status'] = 'processed'
+                        result['detail'] = f'为种子 {torrent.name} 移除辅种标签：{duplicate_tag}'
+                    else:
+                        self.logger.info(f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除")
+                        result['status'] = 'skipped'
+                        result['detail'] = f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除"
                 else:
-                    self.logger.info(f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加")
+                    self.logger.warning(f"未知的操作类型：{opt_type}")
                     result['status'] = 'skipped'
-                    result['detail'] = f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加"
+                    result['detail'] = f"未知的操作类型：{opt_type}"
             else:
-                self.logger.debug(f"种子 {torrent.name} 没有重复，无需添加辅种标签")
+                self.logger.debug(f"种子 {torrent.name} 没有重复，无需处理辅种标签")
                 result['status'] = 'skipped'
-                result['detail'] = f"种子 {torrent.name} 没有重复，无需添加辅种标签"
+                result['detail'] = f"种子 {torrent.name} 没有重复，无需处理辅种标签"
                 
         except Exception as e:
             self.logger.exception(f'处理种子 {torrent.name} 的辅种标签时发生错误: {str(e)}')

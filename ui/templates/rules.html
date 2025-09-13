@@ -45,7 +45,7 @@
                         <label for="newOperationType" class="form-label">操作类型</label>
                         <select class="form-select" id="newOperationType">
                             <option value="add">添加</option>
-                                <option value="delete">删除</option>
+                            <option value="remove">移除</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -59,7 +59,7 @@
                         </div>
                             
                         <div class="mb-3">
-                            <label for="tagToOperate" class="form-label">要添加或删除的标签</label>
+                            <label for="tagToOperate" class="form-label">要添加或移除的标签</label>
                                 <input type="text" class="form-control" id="tagToOperate" placeholder="请输入要添加或删除的标签">
                             </div>
                         </div>
@@ -113,22 +113,26 @@
         ruleTypeSelect.addEventListener('change', function() {
             const tagRuleFields = document.getElementById('tagRuleFields');
             const trackerRuleFields = document.getElementById('trackerRuleFields');
+            const operationTypeGroup = document.getElementById('operationTypeGroup');
             const priorityField = document.querySelector('.mb-3 [id="rulePriority"]').parentElement;
             
             if (this.value === 'tag') {
                 tagRuleFields.style.display = 'block';
                 trackerRuleFields.style.display = 'none';
+                operationTypeGroup.style.display = 'block';
                 priorityField.style.display = 'block';
             } else if (this.value === 'tracker') {
                 tagRuleFields.style.display = 'none';
                 trackerRuleFields.style.display = 'block';
+                operationTypeGroup.style.display = 'block';
                 priorityField.style.display = 'block';
             } else if (this.value === 'duplicate_tag') {
-                // 对于标记辅种规则，隐藏所有特定字段和操作类型选择框
+                // 对于标记辅种规则，隐藏所有特定字段
                 tagRuleFields.style.display = 'none';
                 trackerRuleFields.style.display = 'none';
-                document.getElementById('operationTypeGroup').style.display = 'none';
-                priorityField.style.display = 'none';
+                // 但显示操作类型选择框和优先级
+                operationTypeGroup.style.display = 'block';
+                priorityField.style.display = 'block';
             }
         });
     }
@@ -150,10 +154,8 @@
                 'priority': priority
             };
             
-            // 只有非标记辅种规则才添加opt_type字段
-            if (ruleType !== 'duplicate_tag') {
-                rule['opt_type'] = optType;
-            }
+            // 添加opt_type字段（包括duplicate_tag类型）
+            rule['opt_type'] = optType;
             
             // 根据规则类型添加特定字段
             if (ruleType === 'tag') {
@@ -367,23 +369,31 @@
             // 根据规则类型显示相应的表单字段
             const tagRuleFields = document.getElementById('tagRuleFields');
             const trackerRuleFields = document.getElementById('trackerRuleFields');
+            const operationTypeGroup = document.getElementById('operationTypeGroup');
+            const priorityField = document.querySelector('.mb-3 [id="rulePriority"]').parentElement;
             
             if (rule.rule_type === 'tag_opt') {
                     tagRuleFields.style.display = 'block';
                     trackerRuleFields.style.display = 'none';
+                    operationTypeGroup.style.display = 'block';
+                    priorityField.style.display = 'block';
                     document.getElementById('trackerMatchCondition').value = rule.trackers || '';
                     document.getElementById('tagToOperate').value = rule.tag || '';
                 } else if (rule.rule_type === 'tracker_opt') {
                     tagRuleFields.style.display = 'none';
                     trackerRuleFields.style.display = 'block';
+                    operationTypeGroup.style.display = 'block';
+                    priorityField.style.display = 'block';
                     document.getElementById('tagMatchCondition').value = rule.tags || '';
                     document.getElementById('trackerMatchCondition2').value = rule.trackers || '';
                     document.getElementById('trackerUrlToOperate').value = rule.tracker || '';
                 } else if (rule.rule_type === 'duplicate_tag_opt') {
-                    // 对于标记辅种规则，隐藏所有特定字段和操作类型选择框
+                    // 对于标记辅种规则，隐藏所有特定字段
                     tagRuleFields.style.display = 'none';
                     trackerRuleFields.style.display = 'none';
-                    document.getElementById('operationTypeGroup').style.display = 'none';
+                    // 但显示操作类型选择框和优先级
+                    operationTypeGroup.style.display = 'block';
+                    priorityField.style.display = 'block';
                 }
             
             // 显示模态框
@@ -493,7 +503,7 @@
             
             // 跟踪器URL行
             const trackerRow = document.createElement('tr');
-            trackerRow.innerHTML = `<td>要添加或删除的跟踪器URL</td><td>${rule.tracker || 'N/A'}</td>`;
+            trackerRow.innerHTML = `<td>要添加或移除的跟踪器URL</td><td>${rule.tracker || 'N/A'}</td>`;
             tbody.appendChild(trackerRow);
         }
         
