@@ -30,7 +30,10 @@
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">异常 Tracker 数</h5>
+                    <h5 class="card-title d-flex justify-content-between align-items-center">
+                        异常 Tracker 数
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#nonWorkingTrackersModal">查看</button>
+                    </h5>
                     <p class="card-text" id="nonWorkingTrackers">0</p>
                 </div>
             </div>
@@ -69,10 +72,47 @@
         </div>
     </div>
 </div>
+
+<!-- 非工作Tracker详情模态框 -->
+<div class="modal fade" id="nonWorkingTrackersModal" tabindex="-1" aria-labelledby="nonWorkingTrackersModalLabel" aria-hidden="true">
+    <div class="modal-dialog" style="width: 80%; max-width: 80%;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="nonWorkingTrackersModalLabel">异常Tracker详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="trackerSearch" class="form-label">搜索Tracker</label>
+                    <input type="text" class="form-control" id="trackerSearch" placeholder="输入关键词搜索...">
+                </div>
+                <div class="overflow-auto" style="max-height: 60vh;">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">异常 Tracker URL</th>
+                                <th scope="col">种子名称</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nonWorkingTrackersTableBody">
+                            <!-- 非工作Tracker信息将通过JavaScript动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// 存储非工作tracker数据
+let nonWorkingTrackersData = [];
+
 // 获取仪表板信息（仪表盘页面）
 async function fetchDashboardInfo() {
     try {
@@ -98,6 +138,9 @@ async function fetchDashboardInfo() {
             if (totalTorrentsEl) totalTorrentsEl.textContent = result.data.total_torrents;
             if (totalTrackersEl) totalTrackersEl.textContent = result.data.total_trackers;
             if (nonWorkingTrackersEl) nonWorkingTrackersEl.textContent = result.data.non_working_trackers;
+            
+            // 保存非工作tracker数据
+            nonWorkingTrackersData = result.data.non_working_trackers_detail || [];
             
             // 更新分类统计信息
             const categoryCountsEl = document.getElementById('categoryCounts');
@@ -165,6 +208,9 @@ async function fetchDashboardInfo() {
             
             if (categoryCountsEl) categoryCountsEl.innerHTML = '';
             if (tagCountsEl) tagCountsEl.innerHTML = '';
+            
+            // 清空非工作tracker数据
+            nonWorkingTrackersData = [];
         }
     } catch (error) {
         console.error('获取仪表板信息失败:', error);
@@ -175,12 +221,70 @@ async function fetchDashboardInfo() {
             errorAlert.textContent = '获取仪表板信息失败: ' + error.message;
             errorAlert.style.display = 'block';
         }
+        
+        // 清空非工作tracker数据
+        nonWorkingTrackersData = [];
     }
+}
+
+// 填充非工作tracker表格
+function populateNonWorkingTrackersTable(filterKeyword = '') {
+    const tableBody = document.getElementById('nonWorkingTrackersTableBody');
+    if (!tableBody) return;
+    
+    // 清空表格
+    tableBody.innerHTML = '';
+    
+    // 过滤tracker
+    const filteredTrackers = nonWorkingTrackersData.filter(tracker => {
+        if (!filterKeyword) return true;
+        const keyword = filterKeyword.toLowerCase();
+        return tracker.url.toLowerCase().includes(keyword) || tracker.torrent_name.toLowerCase().includes(keyword);
+    });
+    
+    // 如果没有tracker数据
+    if (filteredTrackers.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+            <td colspan="2" class="text-center">
+                ${filterKeyword ? '没有找到匹配的tracker' : '暂无异常tracker'}
+            </td>
+        `;
+        tableBody.appendChild(emptyRow);
+        return;
+    }
+    
+    // 填充表格
+    filteredTrackers.forEach(tracker => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${tracker.url}</td>
+            <td>${tracker.torrent_name}</td>
+        `;
+        tableBody.appendChild(row);
+    });
 }
 
 // 页面加载时获取仪表板信息
 document.addEventListener('DOMContentLoaded', function() {
     fetchDashboardInfo();
+    
+    // 为非工作tracker模态框添加显示事件
+    const nonWorkingTrackersModal = new bootstrap.Modal(document.getElementById('nonWorkingTrackersModal'));
+    if (nonWorkingTrackersModal) {
+        document.getElementById('nonWorkingTrackersModal').addEventListener('shown.bs.modal', function() {
+            // 显示模态框时填充表格
+            populateNonWorkingTrackersTable();
+        });
+    }
+    
+    // 为搜索框添加输入事件
+    const trackerSearch = document.getElementById('trackerSearch');
+    if (trackerSearch) {
+        trackerSearch.addEventListener('input', function() {
+            populateNonWorkingTrackersTable(this.value);
+        });
+    }
 });
 </script>
 {% endblock %}

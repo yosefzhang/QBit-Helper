@@ -32,4 +32,4 @@ EXPOSE 8080
 ENV PYTHONPATH=/app
 
 # 使用Gunicorn启动应用
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]

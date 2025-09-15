@@ -60,7 +60,8 @@ def get_dashboard_info():
                 'total_trackers': info.total_trackers,
                 'non_working_trackers': info.non_working_trackers,
                 'category_counts': info.category_counts,
-                'tag_counts': info.tag_counts
+                'tag_counts': info.tag_counts,
+                'non_working_trackers_detail': info.non_working_trackers_detail
             }
         })
     except Exception as e:

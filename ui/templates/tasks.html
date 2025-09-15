@@ -295,11 +295,30 @@
         
         // 解析规则字符串为数组
         const rulesList = task.rules ? task.rules.split('|') : [];
-        const rulesDisplay = rulesList.length > 0 ? rulesList.join(', ') : 'N/A';
         
         // 规则行
         const rulesRow = document.createElement('tr');
-        rulesRow.innerHTML = `<td><strong>规则:</strong></td><td>${rulesDisplay}</td>`;
+        const rulesCell = document.createElement('td');
+        rulesCell.innerHTML = '<strong>规则:</strong>';
+        
+        const rulesValueCell = document.createElement('td');
+        if (rulesList.length > 0) {
+            const rulesListElement = document.createElement('ul');
+            rulesListElement.className = 'mb-0 ps-3';
+            
+            rulesList.forEach(rule => {
+                const ruleItem = document.createElement('li');
+                ruleItem.textContent = rule;
+                rulesListElement.appendChild(ruleItem);
+            });
+            
+            rulesValueCell.appendChild(rulesListElement);
+        } else {
+            rulesValueCell.textContent = 'N/A';
+        }
+        
+        rulesRow.appendChild(rulesCell);
+        rulesRow.appendChild(rulesValueCell);
         tbody.appendChild(rulesRow);
         
         // 状态行（仅对自动任务显示）

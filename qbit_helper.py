@@ -31,6 +31,7 @@ class DashboardInfo:
     non_working_trackers: int
     category_counts: Dict[str, int]
     tag_counts: Dict[str, int]
+    non_working_trackers_detail: List[Dict[str, str]]
 
 class QBitHelperBasic:
     def __init__(self, config: str):
@@ -658,6 +659,7 @@ class QBitHelperBasic:
         non_working_trackers = 0
         category_counts = {}
         tag_counts = {}
+        non_working_trackers_detail = []
 
         for torrent in torrents:
             # 统计tracker信息，不统计被禁用的tracker
@@ -668,7 +670,11 @@ class QBitHelperBasic:
                 total_trackers += 1
                 if tracker.status != 2:
                     non_working_trackers += 1
-            
+                    non_working_trackers_detail.append({
+                        'url': tracker.url[:50] + ('...' if len(tracker.url) > 50 else ''),
+                        'torrent_name': torrent.name[:50] + ('...' if len(torrent.name) > 50 else '')
+                    })
+                    
             # 统计分类信息
             category = torrent.category if torrent.category else "未分类"
             category_counts[category] = category_counts.get(category, 0) + 1
@@ -690,9 +696,9 @@ class QBitHelperBasic:
             total_trackers=total_trackers,
             non_working_trackers=non_working_trackers,
             category_counts=category_counts,
-            tag_counts=tag_counts
+            tag_counts=tag_counts,
+            non_working_trackers_detail=non_working_trackers_detail
         )
-        self.logger.info(f"Dashboard info: {dashinfo}")
         return dashinfo
 
     def duplicate_tag_opt_single_torrent_single_rule(self, torrent, rule) -> Dict[str, str]:
@@ -812,7 +818,7 @@ class QBitHelperBasic:
                 'detail': ''
             }
             rule_name = rule.get('rule_name', '未命名规则')
-            self.logger.debug(f'处理种子: {torrent.name}, 操作: {rule_name}')
+            self.logger.debug(f'处理种子: {torrent.name}, 操作规则: {rule_name}')
                 
              # 检查规则是否匹配
             if self.tag_opt_rule_check(torrent, rule):
@@ -823,6 +829,14 @@ class QBitHelperBasic:
                 if hasattr(torrent, 'tags') and torrent.tags:
                     torrent_tags = [t.strip() for t in torrent.tags.split(',') if t.strip()]
                 tag_to_process = rule.get('tag', '')
+                
+                # 如果tag_to_process为空，则记录日志并结束处理
+                if not tag_to_process:
+                    result['status'] = 'skipped'
+                    result['detail'] = f'种子 {torrent.name} 的规则 {rule_name} 中tag_to_process为空，无需处理'
+                    self.logger.info(f'种子 {torrent.name} 的规则 {rule_name} 中tag_to_process为空，无需处理')
+                    return result
+                    
                 if rule.get('opt_type') == 'add': # 添加标签
                     if tag_to_process not in torrent_tags:
                         try:
@@ -941,6 +955,12 @@ class QBitHelperBasic:
                 tracker_to_process = rule.get('tracker', '').strip()
                 opt_type = rule.get('opt_type', '').lower()
                 current_trackers = [t.url for t in torrent.trackers]
+                # 如果tracker_to_process为空，则记录日志并结束处理
+                if not tracker_to_process:
+                    result['status'] = 'skipped'
+                    result['detail'] = f'种子 {torrent.name} 的规则 {rule_name} 中tracker_to_process为空，无需处理'
+                    self.logger.info(f'种子 {torrent.name} 的规则 {rule_name} 中tracker_to_process为空，无需处理')
+                    return result
                 
                 if opt_type == 'add': # 添加tracker
                     if tracker_to_process not in current_trackers:
