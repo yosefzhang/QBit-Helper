@@ -9,5 +9,6 @@ services:
       - /vol2/1000/app/qbit-helper/data:/app/data
     environment:
       - PYTHONPATH=/app
+      - TZ=Asia/Shanghai
     restart: always
     network_mode: bridge
