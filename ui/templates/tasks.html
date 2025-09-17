@@ -21,7 +21,7 @@
                 </div>
                 <div class="collapse" id="logContentContainer">
                     <div class="card-body p-0">
-                        <div id="logContent" class="log-content" style="height: 300px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em; padding: 1rem; background-color: #000; color: #00ff00;">
+                        <div id="logContent" class="log-content" style="height: 500px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em; padding: 1rem; background-color: #f8f9fa; color: #212529;">
                             加载中...
                         </div>
                     </div>
@@ -254,7 +254,6 @@
             actionButton.textContent = '执行';
             actionButton.dataset.index = index;
         }
-        // 移除自动任务的启用/禁用按钮
         
         const editButton = document.createElement('button');
         editButton.className = 'btn btn-sm btn-outline-light me-2 edit-task-btn';
@@ -288,10 +287,13 @@
         nameRow.innerHTML = `<td><strong>任务名称:</strong></td><td>${task.task_name || '未命名任务'}</td>`;
         tbody.appendChild(nameRow);
         
-        // Cron表达式行
-        const cronRow = document.createElement('tr');
-        cronRow.innerHTML = `<td><strong>Cron:</strong></td><td>${task.cron || 'N/A'}</td>`;
-        tbody.appendChild(cronRow);
+        // 只有自动任务才显示Cron表达式行
+        if (task.task_type === 'auto') {
+            // Cron表达式行
+            const cronRow = document.createElement('tr');
+            cronRow.innerHTML = `<td><strong>Cron:</strong></td><td>${task.cron || 'N/A'}</td>`;
+            tbody.appendChild(cronRow);
+        }
         
         // 解析规则字符串为数组
         const rulesList = task.rules ? task.rules.split('|') : [];

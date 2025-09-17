@@ -2,6 +2,7 @@ import os
 import logging
 import yaml
 import time
+import json
 from dataclasses import dataclass, field
 from typing import List, Any, Dict, Optional, Set
 import qbittorrentapi
@@ -465,38 +466,38 @@ class QBitHelperBasic:
             task_name = task_result.get('task_name', '未知任务')
             result = task_result.get('result', {})
             
-            # 构建日志内容
-            if result and 'error' in result:
-                log_entry = f"[{timestamp}] 任务: {task_name} - 执行失败: {result.get('error', '未知错误')}\n"
-            else:
-                # 安全地获取结果统计信息
-                processed_count = result.get('processed_count', 0) if result else 0
-                skipped_count = result.get('skipped_count', 0) if result else 0
-                failed_count = result.get('failed_count', 0) if result else 0
-                
-                log_entry = f"[{timestamp}] 任务: {task_name} - 成功: {processed_count}, " \
-                           f"跳过: {skipped_count}, 失败: {failed_count}\n"
-                
-                # 添加详细的成功信息（安全检查）
-                processed_details = result.get('processed_details') if result else None
-                if processed_details and isinstance(processed_details, list):
-                    log_entry += f"  成功详情:\n"
-                    for detail in processed_details:
-                        if detail:  # 确保detail不是None或空
-                            log_entry += f"    - {detail}\n"
-                
-                # 添加详细的失败信息（安全检查）
-                failed_details = result.get('failed_details') if result else None
-                if failed_details and isinstance(failed_details, list):
-                    log_entry += f"  失败详情:\n"
-                    for detail in failed_details:
-                        if detail:  # 确保detail不是None或空
-                            log_entry += f"    - {detail}\n"
+            # 构建自定义格式的日志条目
+            log_entry = f"[{timestamp}] 任务：{task_name}，结果：\n"
+            log_entry_detail = ""
             
+            # 遍历每个规则的结果
+            for rule_name, rule_result in result.items():
+                # 跳过包含错误信息的条目
+                if not isinstance(rule_result, dict):
+                    continue
+                    
+                # 获取统计数据
+                processed_count = rule_result.get('processed_count', 0)
+                skipped_count = rule_result.get('skipped_count', 0)
+                failed_count = rule_result.get('failed_count', 0)
+                
+                log_entry += f"{rule_name:<15} 已处理：{processed_count:<6} 已跳过：{skipped_count:<6} 已失败：{failed_count}\n"
+                  
+                # 添加处理详情（如果有）
+                processed_detail = rule_result.get('processed_detail', '')
+                if processed_detail:
+                    log_entry_detail += f"{processed_detail}\n"
+                
+                # 添加失败详情（如果有）
+                failed_detail = rule_result.get('failed_detail', '')
+                if failed_detail:
+                    log_entry_detail += f"{failed_detail}\n"
+            if log_entry_detail:
+                log_entry += f"详情：\n{log_entry_detail}"
+                        
             # 写入日志文件
             with open(log_file, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
-                f.write("\n")  # 添加空行分隔
                 
         except Exception as e:
             self.logger.error(f"记录自动任务结果到日志文件时发生错误: {str(e)}")
@@ -522,22 +523,40 @@ class QBitHelperBasic:
             # 执行任务
             result = self.opt_all_torrent(matched_rules)
             
+            # 计算总体统计信息
+            processed_count = 0
+            skipped_count = 0
+            failed_count = 0
+            failed_details = []
+            
+            # 遍历所有规则的结果，计算总体统计信息
+            for rule_name, rule_result in result.items():
+                if isinstance(rule_result, dict):
+                    processed_count += rule_result.get('processed_count', 0)
+                    skipped_count += rule_result.get('skipped_count', 0)
+                    failed_count += rule_result.get('failed_count', 0)
+                    
+                    # 收集失败详情
+                    failed_detail = rule_result.get('failed_detail', '')
+                    if failed_detail:
+                        failed_details.append(f"{rule_name}: {failed_detail}")
+            
             # 记录结果
-            if result['failed_count'] == 0:
-                self.logger.info(f"自动任务 \"{task_name}\" 执行成功，处理了{result['processed_count']}个种子")
+            if failed_count == 0:
+                self.logger.info(f"自动任务 \"{task_name}\" 执行成功，处理了{processed_count}个种子")
                 
                 # 发送通知（如果配置了webhook）
                 if self.config.get('user_config', {}).get('webhook', {}).get('serverchan', {}).get('sc_key'):
                     title = f"qBittorrent助手 - 自动任务执行成功"
-                    desp = f"任务名称: {task_name}\n成功处理种子数: {result['processed_count']}\n跳过种子数: {result['skipped_count']}\n失败种子数: {result['failed_count']}"
+                    desp = f"任务名称: {task_name}\n成功处理种子数: {processed_count}\n跳过种子数: {skipped_count}\n失败种子数: {failed_count}"
                     self.send_webhook_to_serverchan(title, desp)
             else:
-                self.logger.error(f"自动任务 \"{task_name}\" 执行完成，但有{result['failed_count']}个种子处理失败")
+                self.logger.error(f"自动任务 \"{task_name}\" 执行完成，但有{failed_count}个种子处理失败")
                 
                 # 发送通知（如果配置了webhook）
                 if self.config.get('user_config', {}).get('webhook', {}).get('serverchan', {}).get('sc_key'):
                     title = f"qBittorrent助手 - 自动任务执行完成但有失败"
-                    desp = f"任务名称: {task_name}\n成功处理种子数: {result['processed_count']}\n跳过种子数: {result['skipped_count']}\n失败种子数: {result['failed_count']}\n失败详情: {', '.join(result['failed_details'])}"
+                    desp = f"任务名称: {task_name}\n成功处理种子数: {processed_count}\n跳过种子数: {skipped_count}\n失败种子数: {failed_count}\n失败详情: {'; '.join(failed_details)}"
                     self.send_webhook_to_serverchan(title, desp)
         except Exception as e:
             self.logger.error(f"执行自动任务 \"{task.get('task_name', '未命名')}\" 时发生错误: {str(e)}")
@@ -587,16 +606,17 @@ class QBitHelperBasic:
             
             return {
                 'success': True,
-                'message': f'手动任务 "{task_name}" 执行完成',
-                'data': results
+                'message': f'手动任务 "{task_name}" 执行完成'
             }
-
-            # 记录自动任务结果到日志文件（包括错误）
-            self._log_task_result(task_result)
             
         except Exception as e:
             self.logger.error(f"执行手动任务时发生错误: {str(e)}")
-            # 记录自动任务结果到日志文件（包括错误）
+            # 记录手动任务执行结果到日志文件（包括错误）
+            task_result = {
+                'task_name': task_name,
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'result': {'error': str(e)}
+            }
             self._log_task_result(task_result)
             raise
     
@@ -735,11 +755,11 @@ class QBitHelperBasic:
                         self.qbit_client.torrents_add_tags(tags=duplicate_tag, torrent_hashes=torrent.hash)
                         self.logger.info(f"为种子 {torrent.name} 添加辅种标签：{duplicate_tag}")
                         result['status'] = 'processed'
-                        result['detail'] = f'为种子 {torrent.name} 添加辅种标签：{duplicate_tag}'
+                        result['detail'] = f'为种子 {torrent.name} 添加辅种标签：{duplicate_tag} 成功'
                     else:
-                        self.logger.info(f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加")
+                        self.logger.debug(f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加")
                         result['status'] = 'skipped'
-                        result['detail'] = f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加"
+                        result['detail'] = f"种子 {torrent.name} 已存在辅种标签：{duplicate_tag}，无需重复添加 跳过"
                 elif opt_type == 'remove':
                     # 检查当前种子是否包含辅种标签
                     if duplicate_tag in torrent.tags:
@@ -747,24 +767,24 @@ class QBitHelperBasic:
                         self.qbit_client.torrents_remove_tags(tags=duplicate_tag, torrent_hashes=torrent.hash)
                         self.logger.info(f"为种子 {torrent.name} 移除辅种标签：{duplicate_tag}")
                         result['status'] = 'processed'
-                        result['detail'] = f'为种子 {torrent.name} 移除辅种标签：{duplicate_tag}'
+                        result['detail'] = f'为种子 {torrent.name} 移除辅种标签：{duplicate_tag} 成功'
                     else:
-                        self.logger.info(f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除")
+                        self.logger.debug(f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除")
                         result['status'] = 'skipped'
-                        result['detail'] = f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除"
+                        result['detail'] = f"种子 {torrent.name} 不存在辅种标签：{duplicate_tag}，无需移除 跳过"
                 else:
                     self.logger.warning(f"未知的操作类型：{opt_type}")
                     result['status'] = 'skipped'
-                    result['detail'] = f"未知的操作类型：{opt_type}"
+                    result['detail'] = f"未知的操作类型：{opt_type} 跳过"
             else:
                 self.logger.debug(f"种子 {torrent.name} 没有重复，无需处理辅种标签")
                 result['status'] = 'skipped'
-                result['detail'] = f"种子 {torrent.name} 没有重复，无需处理辅种标签"
+                result['detail'] = f"种子 {torrent.name} 没有重复，无需处理辅种标签 跳过"
                 
         except Exception as e:
             self.logger.exception(f'处理种子 {torrent.name} 的辅种标签时发生错误: {str(e)}')
             result['status'] = 'failed'
-            result['detail'] = f'处理种子 {torrent.name} 的辅种标签时发生错误: {str(e)}'
+            result['detail'] = f'处理种子 {torrent.name} 的辅种标签时发生错误: {str(e)} 失败'
             
         return result
     
@@ -1007,54 +1027,63 @@ class QBitHelperBasic:
 
     def opt_single_torrent(self, torrent, rules) -> Dict:
         """根据传入的rules，处理单个的torrent
+        
+        Args:
+            torrent: 种子对象
+            rules: 规则列表
+            
+        Returns:
+            Dict: 每个规则的处理结果
+                - 键为规则名称
+                - 值为包含status和detail的字典
         """
-        # 初始化结果
-        results = {
-            'processed_count': 0,
-            'processed_details': [],
-            'skipped_count': 0,
-            'skipped_details': [],
-            'failed_count': 0,
-            'failed_details': []
-        }
+        # 初始化结果字典
+        results = {}
+        
         try:
-            # 先根据priority排序
-            rules.sort(key=lambda x: x.get('priority', 0))
-            # 遍历rules
-            for rule in rules:
+            # 先根据priority排序规则
+            rules_sorted = sorted(rules, key=lambda x: x.get('priority', 0))
+            for rule in rules_sorted:
+                rule_name = rule.get('rule_name', '未命名规则')
                 rule_type = rule.get('rule_type', '')
-                result = {
-                    'status': '',
-                    'detail': ''
-                }
-                if rule_type == 'tag_opt':
-                    result = self.tag_opt_single_torrent_single_rule(torrent, rule)
-                elif rule_type == 'tracker_opt':
-                    result = self.tracker_opt_single_torrent_single_rule(torrent, rule)
-                elif rule_type == 'duplicate_tag_opt':
-                    result = self.duplicate_tag_opt_single_torrent_single_rule(torrent, rule)
-                else:
-                    self.logger.warning(f'未知的规则类型: {rule_type}')
-                    continue
-                if result['status'] == 'processed':
-                    results['processed_count'] += 1
-                    results['processed_details'].append(result['detail'])
-                elif result['status'] == 'failed':
-                    results['failed_count'] += 1
-                    results['failed_details'].append(result['detail'])
-                elif result['status'] == 'skipped':
-                    results['skipped_count'] += 1
-                    results['skipped_details'].append(result['detail'])
-                else:
-                    self.logger.warning(f'未知的操作结果状态: {result["status"]}')
-                    continue
-                    
+                results[rule_name] = {'status': '', 'detail': ''}
+                
+                try:
+                    # 根据规则类型调用相应的处理函数
+                    if rule_type == 'tag_opt':
+                        results[rule_name] = self.tag_opt_single_torrent_single_rule(torrent, rule)
+                    elif rule_type == 'tracker_opt':
+                        results[rule_name] = self.tracker_opt_single_torrent_single_rule(torrent, rule)
+                    elif rule_type == 'duplicate_tag_opt':
+                        results[rule_name] = self.duplicate_tag_opt_single_torrent_single_rule(torrent, rule)
+                    else:
+                        results[rule_name] = {
+                            'status': 'skipped',
+                            'detail': f'未知的规则类型: {rule_type}'
+                        }
+                        self.logger.warning(f'未知的规则类型: {rule_type}')
+                except Exception as e:
+                    # 单个规则处理失败时的错误处理
+                    error_msg = f'处理种子 {torrent.name} 的规则 {rule_name} 时发生错误: {str(e)}'
+                    results[rule_name] = {
+                        'status': 'failed',
+                        'detail': error_msg
+                    }
+                    self.logger.error(error_msg)
+            
             return results
         except Exception as e:
-            self.logger.exception(f'处理种子 {torrent.name} 时发生错误: {str(e)}')
-            results['failed_count'] += 1
-            results['failed_details'].append(f'处理种子 {torrent.name} 时发生错误: {str(e)}')
-            return results
+            # 全局异常处理
+            torrent_name = getattr(torrent, 'name', '未知')
+            error_msg = f'处理种子 {torrent_name} 时发生严重错误: {str(e)}'
+            self.logger.exception(error_msg)
+            # 返回包含错误信息的最小结果集
+            return {
+                '系统错误': {
+                    'status': 'failed',
+                    'detail': error_msg
+                }
+            }
 
     def opt_all_torrent(self, rules) -> Dict:
         """根据传入的rules，处理所有torrent。
@@ -1062,23 +1091,22 @@ class QBitHelperBasic:
             rules: 规则列表
         Returns:
             Dict: 包含处理结果的字典
-            - processed_count: 实际处理种子数
-            - processed_details: 实际处理详情：xx 种子 处理xx 规则；xx 种子 处理xx 规则；
-            - skipped_count: 无需处理种子数
-            - skipped_details: 无需处理详情：xx 种子 无需处理；xx 种子 无需处理；
-            - failed_count: 处理失败种子数
-            - failed_details: 处理失败详情：xx 种子 处理失败；xx 种子 处理失败；
         """
         self.logger.info(f'开始处理所有种子')
         # 初始化结果
-        results = {
-            'processed_count': 0,
-            'processed_details': [],
-            'skipped_count': 0,
-            'skipped_details': [],
-            'failed_count': 0,
-            'failed_details': []
-        }
+        results = {}
+        
+        # 为每个规则初始化结果结构
+        for rule in rules:
+            rule_name = rule.get('rule_name', '未命名规则')
+            results[rule_name] = {
+                'processed_count': 0,
+                'processed_detail': '',
+                'skipped_count': 0,
+                'skipped_detail': '',
+                'failed_count': 0,
+                'failed_detail': ''
+            }
         
         try:
             # 每次都初始化字典
@@ -1089,18 +1117,26 @@ class QBitHelperBasic:
             # 逐个处理种子
             for torrent in torrents:
                 result = self.opt_single_torrent(torrent, rules)
-                results['processed_count'] += result['processed_count']
-                results['processed_details'].extend(result['processed_details'])
-                results['skipped_count'] += result['skipped_count']
-                results['skipped_details'].extend(result['skipped_details'])
-                results['failed_count'] += result['failed_count']
-                results['failed_details'].extend(result['failed_details'])
                 
-            self.logger.info(f'处理完成: 成功{results["processed_count"]}个, 跳过{results["skipped_count"]}个, 失败{results["failed_count"]}个')
+                # 合并处理结果
+                for rule_name, rule_result in result.items():
+                    if rule_name in results:
+                        rule_status = rule_result.get('status', '')
+                        rule_detail = rule_result.get('detail', '')
+                        if rule_detail:
+                            format_rule_detail = f" - {rule_detail}\n"
+
+                        if rule_status == 'processed':
+                            results[rule_name]['processed_count'] += 1
+                            results[rule_name]['processed_detail'] += format_rule_detail
+                        elif rule_status == 'failed':
+                            results[rule_name]['failed_count'] += 1
+                            results[rule_name]['failed_detail'] += format_rule_detail
+                        elif rule_status == 'skipped':
+                            results[rule_name]['skipped_count'] += 1
+                            results[rule_name]['skipped_detail'] += format_rule_detail
             return results
-            
         except Exception as e:
-            self.logger.exception(f'处理所有种子时发生错误: {str(e)}')
-            results['failed_count'] += 1
-            results['failed_details'].append(f'处理所有种子时发生错误: {str(e)}')
+            error_msg = f'处理所有种子时发生错误: {str(e)}'
+            self.logger.exception(error_msg)
             return results
