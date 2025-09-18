@@ -37,6 +37,9 @@
                         <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="/settings">设置</a>
                     </li>
                 </ul>
+                <div class="sidebar-footer mt-auto text-center text-muted text-sm">
+                    <a href="https://github.com/yosefzhang/QBit-Helper" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">{{ app_version }}</a>
+                </div>
             </div>
             <div class="col-md-10 content">
                 {% block content %}{% endblock %}

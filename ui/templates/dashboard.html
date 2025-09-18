@@ -92,6 +92,7 @@
                             <tr>
                                 <th scope="col">异常 Tracker URL</th>
                                 <th scope="col">种子名称</th>
+                                <th scope="col">Tracker 信息</th>
                             </tr>
                         </thead>
                         <tbody id="nonWorkingTrackersTableBody">
@@ -239,14 +240,16 @@ function populateNonWorkingTrackersTable(filterKeyword = '') {
     const filteredTrackers = nonWorkingTrackersData.filter(tracker => {
         if (!filterKeyword) return true;
         const keyword = filterKeyword.toLowerCase();
-        return tracker.url.toLowerCase().includes(keyword) || tracker.torrent_name.toLowerCase().includes(keyword);
+        return tracker.url.toLowerCase().includes(keyword) || 
+               tracker.torrent_name.toLowerCase().includes(keyword) ||
+               (tracker.tracker_msg && tracker.tracker_msg.toLowerCase().includes(keyword));
     });
     
     // 如果没有tracker数据
     if (filteredTrackers.length === 0) {
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `
-            <td colspan="2" class="text-center">
+            <td colspan="3" class="text-center">
                 ${filterKeyword ? '没有找到匹配的tracker' : '暂无异常tracker'}
             </td>
         `;
@@ -260,6 +263,7 @@ function populateNonWorkingTrackersTable(filterKeyword = '') {
         row.innerHTML = `
             <td>${tracker.url}</td>
             <td>${tracker.torrent_name}</td>
+            <td>${tracker.tracker_msg || '-'}</td>
         `;
         tableBody.appendChild(row);
     });

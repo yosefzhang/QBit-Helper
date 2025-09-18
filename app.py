@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 import os
 import yaml
-from qbit_helper import QBitHelperBasic, DashboardInfo
+from qbit_helper import QBitHelperBasic, DashboardInfo, APP_VERSION
 
 # 配置Flask应用，指定模板和静态文件目录
 app = Flask(__name__, 
@@ -25,25 +25,25 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     """返回仪表盘页面"""
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', app_version=APP_VERSION)
 
 
 @app.route('/tasks')
 def tasks():
     """返回任务页面"""
-    return render_template('tasks.html')
+    return render_template('tasks.html', app_version=APP_VERSION)
 
 
 @app.route('/rules')
 def rules():
     """返回规则页面"""
-    return render_template('rules.html')
+    return render_template('rules.html', app_version=APP_VERSION)
 
 
 @app.route('/settings')
 def settings():
     """返回设置页面"""
-    return render_template('settings.html')
+    return render_template('settings.html', app_version=APP_VERSION)
 
 
 # API路由定义

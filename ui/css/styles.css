@@ -89,3 +89,22 @@
     display: inline-block;
     width: 100px;
 }
+
+/* 侧边栏底部版本号样式 */
+.sidebar {
+    position: relative;
+
+    & .sidebar-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #f8f9fa !important;
+        background-image: none !important;
+        border-top: 1px solid #dee2e6;
+        color: #6c757d;
+        font-size: 0.85rem;
+        padding: 1rem 0;
+        z-index: 10;
+    }
+}

@@ -12,6 +12,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.base import ConflictingIdError
 import atexit
 
+# 应用版本号
+APP_VERSION = "Pre Release v0.1.0"
+
 # 数据类定义
 @dataclass
 class TorrentInfo:
@@ -691,9 +694,10 @@ class QBitHelperBasic:
                 if tracker.status != 2:
                     non_working_trackers += 1
                     non_working_trackers_detail.append({
-                        'url': tracker.url[:50] + ('...' if len(tracker.url) > 50 else ''),
-                        'torrent_name': torrent.name[:50] + ('...' if len(torrent.name) > 50 else '')
-                    })
+                            'url': tracker.url[:50] + ('...' if len(tracker.url) > 50 else ''),
+                            'torrent_name': torrent.name[:50] + ('...' if len(torrent.name) > 50 else ''),
+                            'tracker_msg': tracker.msg[:50] + ('...' if len(tracker.msg) > 50 else '')
+                        })
                     
             # 统计分类信息
             category = torrent.category if torrent.category else "未分类"
