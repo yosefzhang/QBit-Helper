@@ -4,3 +4,4 @@ flask
 apscheduler
 serverchan-sdk
 gunicorn
+requests

@@ -176,6 +176,17 @@ def execute_manual_task():
     except Exception as e:
         return jsonify({'success': False, 'message': f'执行手动任务时发生错误: {str(e)}'}), 500
 
+
+@app.route('/api/config/test_webhooks', methods=['POST'])
+def test_webhooks():
+    """测试webhook配置"""
+    try:
+        result = qbhper.test_webhooks()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 # 用于Gunicorn部署的入口点
 # 当使用Gunicorn运行时，不会执行以下代码
 # Gunicorn会直接导入app对象: gunicorn --bind 0.0.0.0:8080 --workers 4 app:app

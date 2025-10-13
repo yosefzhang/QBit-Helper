@@ -11,6 +11,7 @@
                 <div class="mb-3">
             <button type="button" class="btn btn-primary me-3" id="saveConfigBtn">保存配置</button>
             <button type="button" class="btn btn-primary me-3" id="reloadConfigBtn">重载配置</button>
+            <button type="button" class="btn btn-primary me-3" id="testWebhooksBtn">测试Webhook</button>
         </div>
         <form id="configForm">
             <div class="row">
@@ -26,10 +27,23 @@
                     <label for="password" class="form-label">密码</label>
                     <input type="password" class="form-control" id="password" placeholder="请输入密码">
                 </div>
-                <div class="col-md-3 mb-3">
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
                     <label for="serverKey" class="form-label">Server酱 send key</label>
                     <input type="text" class="form-control" id="serverKey" placeholder="请输入send key">
                 </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="webhookUrl" class="form-label">自定义Webhook URL</label>
+                    <input type="text" class="form-control" id="webhookUrl" placeholder="请输入Webhook URL">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="webhookAuth" class="form-label">Webhook Authorization</label>
+                    <input type="text" class="form-control" id="webhookAuth" placeholder="请输入Authorization令牌（如：Bearer xxx）">
+                </div>
+            </div>
         </div>
         </form>
     </div>
@@ -58,12 +72,53 @@
                     if (config.webhook && config.webhook.serverchan) {
                         document.getElementById('serverKey').value = config.webhook.serverchan.sc_key || '';
                     }
+                    
+                    // 填充自定义Webhook配置
+                    if (config.webhook && config.webhook.custom) {
+                        document.getElementById('webhookUrl').value = config.webhook.custom.url || '';
+                        document.getElementById('webhookAuth').value = config.webhook.custom.authorization || '';
+                    }
                 }
             })
             .catch(error => {
                 console.error('获取用户配置失败:', error);
             });
-    });
+    
+    // 绑定测试Webhook按钮事件
+    const testWebhooksBtn = document.getElementById('testWebhooksBtn');
+    if (testWebhooksBtn) {
+        testWebhooksBtn.addEventListener('click', async function() {
+            try {
+                showToast('正在测试Webhook配置...');
+                const response = await fetch('/api/config/test_webhooks', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    
+                    // 分别显示Server酱测试结果
+                    if (data.serverchan.success) {
+                        showToast('✓ Server酱测试成功', 'success');
+                    } else {
+                        showToast('✗ Server酱测试失败: ' + data.serverchan.message, 'danger');
+                    }
+                    
+                    // 分别显示自定义Webhook测试结果
+                    if (data.custom.success) {
+                        showToast('✓ 自定义Webhook测试成功', 'success');
+                    } else {
+                        showToast('✗ 自定义Webhook测试失败: ' + data.custom.message, 'danger');
+                    }
+                } else {
+                    showToast('Webhook测试失败: ' + result.message, 'danger');
+                }
+            } catch (error) {
+                showToast('测试Webhook失败: ' + error.message, 'danger');
+            }
+        });
+    }
     
     // 绑定重载配置按钮事件（设置页面）
     const reloadConfigBtn = document.getElementById('reloadConfigBtn');
@@ -102,6 +157,8 @@
                 const username = document.getElementById('username') ? document.getElementById('username').value : '';
                 const password = document.getElementById('password') ? document.getElementById('password').value : '';
                 const serverKey = document.getElementById('serverKey') ? document.getElementById('serverKey').value : '';
+                const webhookUrl = document.getElementById('webhookUrl') ? document.getElementById('webhookUrl').value : '';
+                const webhookAuth = document.getElementById('webhookAuth') ? document.getElementById('webhookAuth').value : '';
                 
                 const configData = {
                     qbittorrent: {
@@ -112,6 +169,10 @@
                     webhook: {
                         serverchan: {
                             sc_key: serverKey
+                        },
+                        custom: {
+                            url: webhookUrl,
+                            authorization: webhookAuth
                         }
                     }
                 };
@@ -139,5 +200,6 @@
             }
         });
     }
+});
 </script>
 {% endblock %}
