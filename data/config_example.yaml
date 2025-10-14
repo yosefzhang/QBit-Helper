@@ -15,6 +15,7 @@ user_config:
       sc_key: 1234xxxx
     custom:
       url: http://your-webhook-url.com
-      authorization: Bearer your-token
+      headers:
+        Content-Type: application/json
 user_rules: []
 user_tasks: []

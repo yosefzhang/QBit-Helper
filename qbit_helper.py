@@ -558,7 +558,7 @@ class QBitHelperBasic:
                 if self.config.get('user_config', {}).get('webhook', {}).get('custom', {}).get('url'):
                     title = f"qBittorrent助手 - 自动任务执行成功"
                     desp = f"任务名称: {task_name}\n成功处理种子数: {processed_count}\n跳过种子数: {skipped_count}\n失败种子数: {failed_count}"
-                    self.send_webhook_to_custom(title, desp, 'error')
+                    self.send_webhook_to_custom(title, desp)
             else:
                 self.logger.error(f"自动任务 \"{task_name}\" 执行完成，但有{failed_count}个种子处理失败")
                 
@@ -572,7 +572,7 @@ class QBitHelperBasic:
                 if self.config.get('user_config', {}).get('webhook', {}).get('custom', {}).get('url'):
                     title = f"qBittorrent助手 - 自动任务执行完成但有失败"
                     desp = f"任务名称: {task_name}\n成功处理种子数: {processed_count}\n跳过种子数: {skipped_count}\n失败种子数: {failed_count}\n失败详情: {'; '.join(failed_details)}"
-                    self.send_webhook_to_custom(title, desp, 'error')
+                    self.send_webhook_to_custom(title, desp)
         except Exception as e:
             self.logger.error(f"执行自动任务 \"{task.get('task_name', '未命名')}\" 时发生错误: {str(e)}")
             
@@ -586,7 +586,7 @@ class QBitHelperBasic:
             if self.config.get('user_config', {}).get('webhook', {}).get('custom', {}).get('url'):
                 title = f"qBittorrent助手 - 自动任务执行异常"
                 desp = f"任务名称: {task.get('task_name', '未命名')}\n错误信息: {str(e)}"
-                self.send_webhook_to_custom(title, desp, 'error')
+                self.send_webhook_to_custom(title, desp)
 
     def execute_manual_task(self, task_index):
         """执行手动任务"""
@@ -661,7 +661,7 @@ class QBitHelperBasic:
             self.logger.exception(f'Server酱消息发送异常: {str(e)}')
             return False
     
-    def send_webhook_to_custom(self, title: str, desp: str, level: str = 'info') -> bool:
+    def send_webhook_to_custom(self, title: str, detail: str, tag: str = None, from_: str = None, level: str = 'info') -> bool:
         """发送消息到自定义webhook"""
         try:
             import requests
@@ -673,51 +673,46 @@ class QBitHelperBasic:
                 self.logger.error("自定义webhook未配置")
                 return False
             
-            # 如果是列表格式，遍历处理每个webhook
-            if isinstance(custom_webhook, list):
-                custom_webhooks = custom_webhook
-            else:
-                # 如果是字典格式，将其包装成列表
-                custom_webhooks = [custom_webhook]
-            
             success_count = 0
-            for webhook in custom_webhooks:
-                # 确保webhook是字典类型
-                if not isinstance(webhook, dict):
-                    self.logger.error(f"自定义webhook配置格式错误: {webhook}")
-                    continue
-                    
-                webhook_url = webhook.get('url')
-                authorization = webhook.get('authorization')
-                if not webhook_url:
+            webhook_url = custom_webhook.get('url')
+            if not webhook_url:
                     self.logger.error("自定义webhook URL未配置")
-                    continue
-                
-                headers = {'content-type': 'application/json'}
-                if authorization:
-                    headers['authorization'] = authorization
+                    return False
 
-                # 填充消息内容
-                body = {
-                    'msg_type': 'markdown',
-                    'content': {
-                        'title': title,
-                        'detail': desp,
-                        'from': 'QBit-Helper',
-                        'tag': 'QBit-Helper',
-                        'level': level
-                    }
+            headers = custom_webhook.get('headers', {})
+            if 'Content-Type' not in headers:
+                headers['Content-Type'] = 'application/json'
+
+            # 检查参数配置，并设置默认值，title 和 detail 必须存在一个
+            if not title and not detail:
+                self.logger.error("自定义webhook消息标题和详情不能同时为空")
+                return False
+            if not tag:
+                tag = 'QBit-Helper'
+            if not from_:
+                from_ = 'QBit-Helper'
+            
+            # 填充消息内容
+            body = {
+                'msg_type': 'markdown',
+                'content': {
+                    'title': title,
+                    'detail': detail,
+                    'from': from_,
+                    'tag': tag,
+                    'level': level
                 }
+            }
                 
-                # 发送POST请求
-                self.logger.info(f'发送消息到自定义webhook: {webhook_url}')
-                response = requests.post(webhook_url, headers=headers, json=body, timeout=10)
-                
-                if response.status_code >= 200 and response.status_code < 300:
-                    self.logger.info(f'自定义webhook消息发送成功: {webhook_url}')
-                    success_count += 1
-                else:
-                    self.logger.error(f'自定义webhook消息发送失败: {webhook_url}, 状态码: {response.status_code}, 响应: {response.text}')
+            # 发送POST请求
+            self.logger.info(f'发送消息到自定义webhook: {webhook_url}')
+            response = requests.post(webhook_url, headers=headers, json=body, timeout=10)
+            
+            if response.status_code >= 200 and response.status_code < 300:
+                self.logger.info(f'自定义webhook消息发送成功: {webhook_url}')
+                success_count += 1
+            else:
+                self.logger.error(f'自定义webhook消息发送失败: {webhook_url}, 状态码: {response.status_code}, 响应: {response.text}')
             
             return success_count > 0
         except Exception as e:
@@ -744,11 +739,7 @@ class QBitHelperBasic:
         
         # 测试自定义webhook
         try:
-            custom_success = self.send_webhook_to_custom(
-                "Webhook测试消息", 
-                "这是一条测试消息，用于验证自定义webhook配置是否正确。",
-                'warning'
-            )
+            custom_success = self.send_webhook_to_custom("测试标题", "这是一条测试消息。")
             result['custom']['success'] = custom_success
             result['custom']['message'] = "自定义webhook测试消息发送成功" if custom_success else "自定义webhook测试消息发送失败"
         except Exception as e:

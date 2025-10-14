@@ -39,9 +39,11 @@
                     <label for="webhookUrl" class="form-label">自定义Webhook URL</label>
                     <input type="text" class="form-control" id="webhookUrl" placeholder="请输入Webhook URL">
                 </div>
+            </div>
+            <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label for="webhookAuth" class="form-label">Webhook Authorization</label>
-                    <input type="text" class="form-control" id="webhookAuth" placeholder="请输入Authorization令牌（如：Bearer xxx）">
+                    <label for="webhookHeaders" class="form-label">Headers (每行一个，格式：Key: Value)</label>
+                    <textarea class="form-control" id="webhookHeaders" rows="3" placeholder="Content-Type: application/json&#10;Authorization: Bearer xxx"></textarea>
                 </div>
             </div>
         </div>
@@ -76,7 +78,13 @@
                     // 填充自定义Webhook配置
                     if (config.webhook && config.webhook.custom) {
                         document.getElementById('webhookUrl').value = config.webhook.custom.url || '';
-                        document.getElementById('webhookAuth').value = config.webhook.custom.authorization || '';
+                        // 将headers对象转换为多行文本
+                        if (config.webhook.custom.headers) {
+                            const headersText = Object.entries(config.webhook.custom.headers)
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join('\n');
+                            document.getElementById('webhookHeaders').value = headersText || '';
+                        }
                     }
                 }
             })
@@ -158,7 +166,18 @@
                 const password = document.getElementById('password') ? document.getElementById('password').value : '';
                 const serverKey = document.getElementById('serverKey') ? document.getElementById('serverKey').value : '';
                 const webhookUrl = document.getElementById('webhookUrl') ? document.getElementById('webhookUrl').value : '';
-                const webhookAuth = document.getElementById('webhookAuth') ? document.getElementById('webhookAuth').value : '';
+                const webhookHeaders = document.getElementById('webhookHeaders') ? document.getElementById('webhookHeaders').value : '';
+                
+                // 将多行文本转换为headers对象
+                const headers = {};
+                if (webhookHeaders) {
+                    webhookHeaders.split('\n').forEach(line => {
+                        const [key, value] = line.split(':').map(s => s.trim());
+                        if (key && value) {
+                            headers[key] = value;
+                        }
+                    });
+                }
                 
                 const configData = {
                     qbittorrent: {
@@ -172,7 +191,7 @@
                         },
                         custom: {
                             url: webhookUrl,
-                            authorization: webhookAuth
+                            headers: headers
                         }
                     }
                 };
